@@ -41,7 +41,7 @@ class OllamaClient(BaseLLMClient):
                         "type": "function",
                         "function": {
                             "name": tc.name,
-                            "arguments": json.dumps(tc.arguments),
+                            "arguments": tc.arguments,  # Ollama expects object, not JSON string
                         },
                     }
                     for tc in msg.tool_calls
