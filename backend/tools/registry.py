@@ -1,0 +1,166 @@
+"""Tool registry for managing diagnostic functions."""
+
+import inspect
+from functools import wraps
+from typing import Any, Callable, TypeVar
+
+from .schemas import ToolCall, ToolDefinition, ToolParameter, ToolResult
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+class ToolRegistry:
+    """Registry for managing diagnostic tools."""
+
+    def __init__(self):
+        """Initialize empty registry."""
+        self._tools: dict[str, Callable[..., Any]] = {}
+        self._definitions: dict[str, ToolDefinition] = {}
+
+    def register(
+        self,
+        name: str,
+        description: str,
+        parameters: list[ToolParameter] | None = None,
+    ) -> Callable[[F], F]:
+        """
+        Decorator to register a function as a tool.
+
+        Args:
+            name: Tool name
+            description: Tool description for LLM
+            parameters: List of parameter definitions
+
+        Returns:
+            Decorator function
+        """
+
+        def decorator(func: F) -> F:
+            self._tools[name] = func
+            self._definitions[name] = ToolDefinition(
+                name=name,
+                description=description,
+                parameters=parameters or [],
+            )
+            return func
+
+        return decorator
+
+    def get_tool(self, name: str) -> Callable[..., Any] | None:
+        """Get a registered tool by name."""
+        return self._tools.get(name)
+
+    def get_definition(self, name: str) -> ToolDefinition | None:
+        """Get a tool definition by name."""
+        return self._definitions.get(name)
+
+    def get_all_definitions(self) -> list[ToolDefinition]:
+        """Get all registered tool definitions."""
+        return list(self._definitions.values())
+
+    def get_openai_tools(self) -> list[dict[str, Any]]:
+        """Get all tools in OpenAI schema format."""
+        return [d.to_openai_schema() for d in self._definitions.values()]
+
+    def get_ollama_tools(self) -> list[dict[str, Any]]:
+        """Get all tools in Ollama schema format."""
+        return [d.to_ollama_schema() for d in self._definitions.values()]
+
+    async def execute(self, tool_call: ToolCall) -> ToolResult:
+        """
+        Execute a tool call.
+
+        Args:
+            tool_call: The tool call to execute
+
+        Returns:
+            ToolResult with execution result
+        """
+        tool = self.get_tool(tool_call.name)
+
+        if tool is None:
+            return ToolResult(
+                tool_call_id=tool_call.id,
+                name=tool_call.name,
+                content=f"Error: Unknown tool '{tool_call.name}'",
+                success=False,
+            )
+
+        try:
+            # Call the tool (support both sync and async)
+            if inspect.iscoroutinefunction(tool):
+                result = await tool(**tool_call.arguments)
+            else:
+                result = tool(**tool_call.arguments)
+
+            # Convert result to string if needed
+            if hasattr(result, "to_llm_response"):
+                content = result.to_llm_response()
+            elif hasattr(result, "model_dump_json"):
+                content = result.model_dump_json(indent=2)
+            else:
+                content = str(result)
+
+            return ToolResult(
+                tool_call_id=tool_call.id,
+                name=tool_call.name,
+                content=content,
+                success=True,
+            )
+
+        except Exception as e:
+            return ToolResult(
+                tool_call_id=tool_call.id,
+                name=tool_call.name,
+                content=f"Error executing tool: {str(e)}",
+                success=False,
+            )
+
+    def __contains__(self, name: str) -> bool:
+        """Check if a tool is registered."""
+        return name in self._tools
+
+    def __len__(self) -> int:
+        """Get number of registered tools."""
+        return len(self._tools)
+
+
+# Global registry instance
+_registry: ToolRegistry | None = None
+
+
+def get_registry() -> ToolRegistry:
+    """Get or create global tool registry."""
+    global _registry
+    if _registry is None:
+        _registry = ToolRegistry()
+    return _registry
+
+
+def tool(
+    name: str,
+    description: str,
+    parameters: list[ToolParameter] | None = None,
+) -> Callable[[F], F]:
+    """
+    Decorator to register a function as a tool in the global registry.
+
+    Args:
+        name: Tool name
+        description: Tool description for LLM
+        parameters: List of parameter definitions
+
+    Returns:
+        Decorator function
+
+    Example:
+        @tool(
+            name="check_adapter_status",
+            description="Check if network adapters are enabled",
+        )
+        async def check_adapter_status():
+            ...
+    """
+    registry = get_registry()
+    return registry.register(name, description, parameters)
+
