@@ -1,12 +1,16 @@
 """LLM router for managing multiple backends."""
 
-from typing import Literal
+import time
+from typing import TYPE_CHECKING, Literal
 
 from ..config import Settings, get_settings
 from ..tools.schemas import ToolDefinition
 from .base import BaseLLMClient, ChatMessage, ChatResponse
 from .ollama_client import OllamaClient
 from .openai_client import OpenAIClient
+
+if TYPE_CHECKING:
+    from analytics import AnalyticsCollector
 
 
 class LLMRouter:
@@ -16,6 +20,7 @@ class LLMRouter:
         self,
         settings: Settings | None = None,
         prefer: Literal["ollama", "openai"] | None = None,
+        analytics_collector: "AnalyticsCollector | None" = None,
     ):
         """
         Initialize LLM router.
@@ -23,13 +28,17 @@ class LLMRouter:
         Args:
             settings: Application settings (uses global if not provided)
             prefer: Preferred backend (overrides settings)
+            analytics_collector: Optional analytics collector for tracking
         """
         self.settings = settings or get_settings()
         self.preferred = prefer or self.settings.llm_backend
+        self._analytics = analytics_collector
 
         self._ollama: OllamaClient | None = None
         self._openai: OpenAIClient | None = None
         self._active: BaseLLMClient | None = None
+        self._had_fallback: bool = False
+        self._fallback_from: str | None = None
 
     @property
     def ollama(self) -> OllamaClient:
@@ -50,6 +59,10 @@ class LLMRouter:
                 model=self.settings.openai_model,
             )
         return self._openai
+
+    def set_analytics(self, collector: "AnalyticsCollector") -> None:
+        """Set the analytics collector."""
+        self._analytics = collector
 
     async def get_client(self) -> BaseLLMClient:
         """
@@ -74,7 +87,16 @@ class LLMRouter:
 
             # Fallback to OpenAI
             if self.openai and await self.openai.is_available():
+                self._had_fallback = True
+                self._fallback_from = "ollama"
                 self._active = self.openai
+                # Record fallback in analytics
+                if self._analytics:
+                    self._analytics.record_fallback(
+                        from_backend="ollama",
+                        to_backend="openai",
+                        reason="Ollama not available",
+                    )
                 return self._active
 
         else:  # Prefer OpenAI
@@ -84,7 +106,16 @@ class LLMRouter:
 
             # Fallback to Ollama
             if await self.ollama.is_available():
+                self._had_fallback = True
+                self._fallback_from = "openai"
                 self._active = self.ollama
+                # Record fallback in analytics
+                if self._analytics:
+                    self._analytics.record_fallback(
+                        from_backend="openai",
+                        to_backend="ollama",
+                        reason="OpenAI not available",
+                    )
                 return self._active
 
         raise RuntimeError(
@@ -110,7 +141,28 @@ class LLMRouter:
             ChatResponse from LLM
         """
         client = await self.get_client()
-        return await client.chat(messages, tools, temperature)
+        
+        # Track timing for analytics
+        start_time = time.perf_counter()
+        response = await client.chat(messages, tools, temperature)
+        duration_ms = int((time.perf_counter() - start_time) * 1000)
+        
+        # Record in analytics if available
+        if self._analytics:
+            prompt_tokens = 0
+            completion_tokens = 0
+            if response.usage:
+                prompt_tokens = response.usage.get("prompt_tokens", 0)
+                completion_tokens = response.usage.get("completion_tokens", 0)
+            
+            self._analytics.record_llm_call(
+                duration_ms=duration_ms,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                model_name=client.model_name,
+            )
+        
+        return response
 
     async def is_available(self) -> dict[str, bool]:
         """Check availability of all backends."""
@@ -130,6 +182,22 @@ class LLMRouter:
         if self._active:
             return self._active.model_name
         return None
+
+    @property
+    def active_backend(self) -> str | None:
+        """Get the name of the active backend."""
+        if self._active is None:
+            return None
+        if self._active == self._ollama:
+            return "ollama"
+        if self._active == self._openai:
+            return "openai"
+        return None
+
+    @property
+    def had_fallback(self) -> bool:
+        """Check if a fallback occurred."""
+        return self._had_fallback
 
     async def close(self):
         """Close all clients."""

@@ -1,10 +1,14 @@
 """Tool registry for managing diagnostic functions."""
 
 import inspect
+import time
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 from .schemas import ToolCall, ToolDefinition, ToolParameter, ToolResult
+
+if TYPE_CHECKING:
+    from analytics import AnalyticsCollector
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -16,6 +20,11 @@ class ToolRegistry:
         """Initialize empty registry."""
         self._tools: dict[str, Callable[..., Any]] = {}
         self._definitions: dict[str, ToolDefinition] = {}
+        self._analytics: "AnalyticsCollector | None" = None
+
+    def set_analytics(self, collector: "AnalyticsCollector") -> None:
+        """Set the analytics collector for tracking tool execution."""
+        self._analytics = collector
 
     def register(
         self,
@@ -79,12 +88,27 @@ class ToolRegistry:
         tool = self.get_tool(tool_call.name)
 
         if tool is None:
+            # Record failed tool call in analytics
+            if self._analytics:
+                self._analytics.record_tool_call(
+                    tool_name=tool_call.name,
+                    duration_ms=0,
+                    success=False,
+                    error_message=f"Unknown tool '{tool_call.name}'",
+                    arguments=tool_call.arguments,
+                )
             return ToolResult(
                 tool_call_id=tool_call.id,
                 name=tool_call.name,
                 content=f"Error: Unknown tool '{tool_call.name}'",
                 success=False,
             )
+
+        # Track execution time
+        start_time = time.perf_counter()
+        error_message: str | None = None
+        success = True
+        content = ""
 
         try:
             # Call the tool (support both sync and async)
@@ -101,20 +125,33 @@ class ToolRegistry:
             else:
                 content = str(result)
 
-            return ToolResult(
-                tool_call_id=tool_call.id,
-                name=tool_call.name,
-                content=content,
-                success=True,
+        except Exception as e:
+            success = False
+            error_message = str(e)
+            content = f"Error executing tool: {error_message}"
+
+        # Calculate duration
+        duration_ms = int((time.perf_counter() - start_time) * 1000)
+
+        # Record in analytics
+        if self._analytics:
+            # Truncate result summary for storage
+            result_summary = content[:200] if len(content) > 200 else content
+            self._analytics.record_tool_call(
+                tool_name=tool_call.name,
+                duration_ms=duration_ms,
+                success=success,
+                error_message=error_message,
+                arguments=tool_call.arguments,
+                result_summary=result_summary,
             )
 
-        except Exception as e:
-            return ToolResult(
-                tool_call_id=tool_call.id,
-                name=tool_call.name,
-                content=f"Error executing tool: {str(e)}",
-                success=False,
-            )
+        return ToolResult(
+            tool_call_id=tool_call.id,
+            name=tool_call.name,
+            content=content,
+            success=success,
+        )
 
     def __contains__(self, name: str) -> bool:
         """Check if a tool is registered."""

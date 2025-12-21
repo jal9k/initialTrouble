@@ -19,10 +19,14 @@ from .models import (
     SessionOutcome,
     IssueCategory,
     EventType,
+    ToolStats,
+    SessionSummary,
+    QualityMetrics,
 )
-from .collector import AnalyticsCollector, get_collector
+from .collector import AnalyticsCollector, get_collector, reset_collector
 from .storage import AnalyticsStorage
 from .cost import CostCalculator
+from .patterns import PatternAnalyzer
 
 __all__ = [
     # Models
@@ -34,10 +38,15 @@ __all__ = [
     "SessionOutcome",
     "IssueCategory",
     "EventType",
+    "ToolStats",
+    "SessionSummary",
+    "QualityMetrics",
     # Core
     "AnalyticsCollector",
     "get_collector",
+    "reset_collector",
     "AnalyticsStorage",
     "CostCalculator",
+    "PatternAnalyzer",
 ]
 

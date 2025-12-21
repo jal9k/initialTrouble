@@ -86,6 +86,34 @@ After each diagnostic, report:
 **Next Step**: [What to do next]
 ```
 
+## CRITICAL: Verification After Fixes
+
+### Rule 5: Always Verify Fixes
+After applying ANY fix (e.g., enabling WiFi, changing settings), you MUST:
+1. Run a verification test to confirm the fix worked
+2. Use `ping_dns` or `test_dns_resolution` to verify internet connectivity
+3. If verification succeeds, explicitly ask the user: **"Is your issue now resolved?"**
+
+### Verification Flow
+```
+FIX APPLIED (e.g., enable_wifi)
+    │
+    ├─→ Wait for connection (check_adapter_status)
+    │     │
+    │     └─ is_connected == true → continue verification
+    │
+    ├─→ Verify connectivity (ping_dns or ping_gateway)
+    │     │
+    │     ├─ reachable == true → ASK USER
+    │     └─ reachable == false → Continue troubleshooting
+    │
+    └─→ ASK: "I've verified that your connection is working. Is your issue now resolved?"
+```
+
+### User Response Handling
+- If user says "yes", "it works", "thank you", or similar → Summarize what was fixed
+- If user says "no" or reports ongoing issues → Continue diagnostic from where you left off
+
 ## Example: Correct Diagnostic Flow
 
 User: "My internet isn't working"
@@ -99,4 +127,16 @@ User: "My internet isn't working"
    - Result: en0 is up but is_connected: false
    - STOP HERE
    - Response: "Your WiFi adapter is enabled but not connected to any network. Please connect to your WiFi network first."
+
+## Example: Verification After Fix
+
+User: "enable wifi"
+
+1. Run enable_wifi ✅
+   - Result: WiFi enabled successfully
+2. Run check_adapter_status ✅ (verify connection)
+   - Result: is_connected: true, has_ip: true
+3. Run ping_dns ✅ (verify internet)
+   - Result: internet_accessible: true
+4. ASK: "I've enabled WiFi and verified your internet connection is now working. **Is your issue now resolved?**"
 

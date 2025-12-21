@@ -1,17 +1,23 @@
 """CLI interface for Network Diagnostics."""
 
 import asyncio
+import re
+from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 
 from .config import get_settings
 from .llm import ChatMessage, LLMRouter
 from .tools import ToolRegistry, get_registry
 from .prompts import AgentType, load_prompt, get_prompt_for_context
+
+# Import analytics
+from analytics import AnalyticsCollector, AnalyticsStorage
+from analytics.models import SessionOutcome, IssueCategory
 
 # Initialize CLI app and console
 app = typer.Typer(
@@ -20,12 +26,82 @@ app = typer.Typer(
 )
 console = Console()
 
+# Resolution detection patterns
+RESOLUTION_PATTERNS = [
+    r"\b(thank(?:s|you)?|works?|working|fixed|resolved|perfect|great|awesome)\b",
+    r"\b(it'?s?\s+(?:working|fixed|good|fine))\b",
+    r"\b(problem\s+solved)\b",
+    r"\b(all\s+good)\b",
+    r"\b(yes|yep|yeah|yup)\b",
+]
+
+def detect_resolution_signal(text: str) -> bool:
+    """Detect if user message indicates resolution."""
+    text_lower = text.lower()
+    for pattern in RESOLUTION_PATTERNS:
+        if re.search(pattern, text_lower):
+            return True
+    return False
+
+
+def prompt_for_feedback(collector: AnalyticsCollector) -> None:
+    """Prompt user for feedback after session."""
+    console.print("\n" + "-" * 50)
+    console.print("[bold blue]Session Feedback[/bold blue]")
+    
+    try:
+        resolved = Prompt.ask(
+            "Was your issue resolved?",
+            choices=["y", "n", "s"],
+            default="s",
+        )
+        
+        if resolved == "s":
+            # User skipped - mark as abandoned
+            collector.end_session(outcome=SessionOutcome.ABANDONED)
+            return
+        
+        outcome = SessionOutcome.RESOLVED if resolved == "y" else SessionOutcome.UNRESOLVED
+        
+        # Ask for rating
+        score_str = Prompt.ask(
+            "Rate your experience (1-5, or skip)",
+            default="s",
+        )
+        
+        if score_str != "s" and score_str.isdigit():
+            score = int(score_str)
+            if 1 <= score <= 5:
+                collector.record_feedback(
+                    score=score,
+                    source="cli",
+                )
+        
+        # End session with outcome
+        collector.end_session(outcome=outcome)
+        console.print("[dim]Thank you for your feedback![/dim]")
+        
+    except (KeyboardInterrupt, EOFError):
+        collector.end_session(outcome=SessionOutcome.ABANDONED)
+        console.print("\n[dim]Feedback skipped.[/dim]")
+
 
 async def run_chat_loop():
     """Main chat loop."""
     settings = get_settings()
-    llm_router = LLMRouter(settings)
+    
+    # Initialize analytics
+    db_path = Path("data/analytics.db")
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    storage = AnalyticsStorage(db_path)
+    collector = AnalyticsCollector(storage=storage)
+    
+    # Initialize LLM router with analytics
+    llm_router = LLMRouter(settings, analytics_collector=collector)
     tool_registry = get_registry()
+    
+    # Connect analytics to tool registry
+    tool_registry.set_analytics(collector)
 
     # Register diagnostics
     from .diagnostics import register_all_diagnostics
@@ -49,7 +125,8 @@ async def run_chat_loop():
         return
 
     console.print(f"\nUsing model: [cyan]{llm_router.active_model or 'auto'}[/cyan]")
-    console.print("Type your network problem or 'quit' to exit.\n")
+    console.print("Type your network problem or 'quit' to exit.")
+    console.print("[dim]Commands: /feedback (rate session), /stats (show analytics)[/dim]\n")
     console.print("-" * 50)
 
     # Load diagnostic agent prompt (follows OSI ladder properly)
@@ -59,6 +136,14 @@ async def run_chat_loop():
     messages: list[ChatMessage] = [
         ChatMessage(role="system", content=system_prompt)
     ]
+    
+    # Start analytics session
+    session = collector.start_session()
+    console.print(f"[dim]Session: {session.session_id[:8]}...[/dim]")
+    
+    # Track if we should prompt for feedback
+    resolution_detected = False
+    first_message = True
 
     # Chat loop
     while True:
@@ -68,10 +153,41 @@ async def run_chat_loop():
 
             if user_input.lower() in ("quit", "exit", "q"):
                 console.print("\n[dim]Goodbye![/dim]")
+                # Prompt for feedback before exiting
+                prompt_for_feedback(collector)
                 break
+            
+            # Handle special commands
+            if user_input.strip() == "/feedback":
+                prompt_for_feedback(collector)
+                # Start a new session after feedback
+                session = collector.start_session()
+                console.print(f"\n[dim]New session: {session.session_id[:8]}...[/dim]")
+                messages = [ChatMessage(role="system", content=system_prompt)]
+                resolution_detected = False
+                first_message = True
+                continue
+            
+            if user_input.strip() == "/stats":
+                summary = storage.get_session_summary()
+                console.print("\n[bold]Analytics Summary[/bold]")
+                console.print(f"  Total sessions: {summary.total_sessions}")
+                console.print(f"  Resolved: {summary.resolved_count} ({summary.success_rate:.1f}%)")
+                console.print(f"  Avg tokens/session: {summary.avg_tokens_per_session:.0f}")
+                console.print(f"  Avg time to resolution: {summary.avg_time_to_resolution_seconds:.1f}s")
+                if summary.total_cost_usd > 0:
+                    console.print(f"  Total OpenAI cost: ${summary.total_cost_usd:.4f}")
+                continue
 
             if not user_input.strip():
                 continue
+            
+            # Record user message
+            collector.record_user_message(user_input)
+            
+            # Check for resolution signal
+            if detect_resolution_signal(user_input):
+                resolution_detected = True
 
             # Add user message
             messages.append(ChatMessage(role="user", content=user_input))
@@ -85,6 +201,15 @@ async def run_chat_loop():
                 tools=tools,
                 temperature=0.3,
             )
+            
+            # Set backend info after first LLM call
+            if first_message and llm_router.active_backend:
+                collector.set_session_backend(
+                    backend=llm_router.active_backend,
+                    model_name=llm_router.active_model or "unknown",
+                    had_fallback=llm_router.had_fallback,
+                )
+                first_message = False
 
             # Handle tool calls
             if response.has_tool_calls and response.message.tool_calls:
@@ -129,9 +254,27 @@ async def run_chat_loop():
             console.print("\n[bold blue]Assistant[/bold blue]")
             md = Markdown(response.content)
             console.print(md)
+            
+            # If resolution was detected, prompt for feedback
+            if resolution_detected:
+                console.print("\n[dim]It looks like your issue may be resolved![/dim]")
+                want_feedback = Prompt.ask(
+                    "Would you like to provide feedback?",
+                    choices=["y", "n"],
+                    default="n",
+                )
+                if want_feedback == "y":
+                    prompt_for_feedback(collector)
+                    # Start new session
+                    session = collector.start_session()
+                    console.print(f"\n[dim]New session: {session.session_id[:8]}...[/dim]")
+                    messages = [ChatMessage(role="system", content=system_prompt)]
+                    first_message = True
+                resolution_detected = False
 
         except KeyboardInterrupt:
             console.print("\n\n[dim]Interrupted. Goodbye![/dim]")
+            collector.end_session(outcome=SessionOutcome.ABANDONED)
             break
 
         except Exception as e:

@@ -1,6 +1,7 @@
 """FastAPI entry point for Network Diagnostics API."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -11,6 +12,10 @@ from .config import get_settings
 from .llm import ChatMessage, LLMRouter
 from .tools import ToolRegistry, get_registry
 from .prompts import AgentType, load_prompt
+
+# Import analytics
+from analytics import AnalyticsCollector, AnalyticsStorage
+from analytics.api import create_analytics_router, create_feedback_router
 
 
 # Request/Response models
@@ -33,6 +38,10 @@ class ChatResponseModel(BaseModel):
         description="Tools that were called",
     )
     conversation_id: str = Field(description="Conversation ID")
+    session_id: str | None = Field(
+        default=None,
+        description="Analytics session ID",
+    )
 
 
 class HealthResponse(BaseModel):
@@ -51,6 +60,10 @@ class AppState:
         self.llm_router: LLMRouter | None = None
         self.tool_registry: ToolRegistry | None = None
         self.conversations: dict[str, list[ChatMessage]] = {}
+        self.analytics_storage: AnalyticsStorage | None = None
+        self.analytics_collector: AnalyticsCollector | None = None
+        # Map conversation_id to analytics session_id
+        self.session_map: dict[str, str] = {}
 
 
 state = AppState()
@@ -61,13 +74,28 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
     settings = get_settings()
-    state.llm_router = LLMRouter(settings)
+    
+    # Initialize analytics
+    db_path = Path("data/analytics.db")
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    state.analytics_storage = AnalyticsStorage(db_path)
+    state.analytics_collector = AnalyticsCollector(storage=state.analytics_storage)
+    
+    # Initialize LLM router with analytics
+    state.llm_router = LLMRouter(settings, analytics_collector=state.analytics_collector)
     state.tool_registry = get_registry()
+    
+    # Connect analytics to tool registry
+    state.tool_registry.set_analytics(state.analytics_collector)
 
     # Register diagnostic tools
     from .diagnostics import register_all_diagnostics
 
     register_all_diagnostics(state.tool_registry)
+    
+    # Register analytics API routes
+    app.include_router(create_analytics_router(state.analytics_storage))
+    app.include_router(create_feedback_router(state.analytics_storage))
 
     yield
 
@@ -117,10 +145,15 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
 
     if not state.llm_router or not state.tool_registry:
         raise RuntimeError("Application not initialized")
+    
+    if not state.analytics_collector:
+        raise RuntimeError("Analytics not initialized")
 
     # Get or create conversation
     conv_id = request.conversation_id or str(uuid.uuid4())
-    if conv_id not in state.conversations:
+    is_new_conversation = conv_id not in state.conversations
+    
+    if is_new_conversation:
         # Use diagnostic agent prompt (follows OSI ladder properly)
         system_prompt = load_prompt(AgentType.DIAGNOSTIC)
         state.conversations[conv_id] = [
@@ -129,6 +162,13 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
                 content=system_prompt,
             )
         ]
+        
+        # Start new analytics session
+        session = state.analytics_collector.start_session(session_id=conv_id)
+        state.session_map[conv_id] = session.session_id
+
+    # Record user message in analytics
+    state.analytics_collector.record_user_message(request.message)
 
     # Add user message
     state.conversations[conv_id].append(
@@ -142,6 +182,14 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
         tools=tools,
         temperature=0.3,
     )
+    
+    # Update session with backend info after first LLM call
+    if is_new_conversation and state.llm_router.active_backend:
+        state.analytics_collector.set_session_backend(
+            backend=state.llm_router.active_backend,
+            model_name=state.llm_router.active_model or "unknown",
+            had_fallback=state.llm_router.had_fallback,
+        )
 
     # Handle tool calls
     tool_results = []
@@ -183,6 +231,7 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
         response=response.content,
         tool_calls=tool_results if tool_results else None,
         conversation_id=conv_id,
+        session_id=state.session_map.get(conv_id),
     )
 
 
