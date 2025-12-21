@@ -14,10 +14,14 @@ from .config import get_settings
 from .llm import ChatMessage, LLMRouter
 from .tools import ToolRegistry, get_registry
 from .prompts import AgentType, load_prompt, get_prompt_for_context
+from .logging_config import setup_logging, get_logger
 
 # Import analytics
 from analytics import AnalyticsCollector, AnalyticsStorage
 from analytics.models import SessionOutcome, IssueCategory
+
+# Initialize logging
+logger = get_logger("network_diag.cli")
 
 # Initialize CLI app and console
 app = typer.Typer(
@@ -90,6 +94,11 @@ async def run_chat_loop():
     """Main chat loop."""
     settings = get_settings()
     
+    # Setup logging
+    log_level = "DEBUG" if settings.debug else "INFO"
+    setup_logging(level=log_level)
+    logger.info("Starting chat loop")
+    
     # Initialize analytics
     db_path = Path("data/analytics.db")
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,6 +108,7 @@ async def run_chat_loop():
     # Initialize LLM router with analytics
     llm_router = LLMRouter(settings, analytics_collector=collector)
     tool_registry = get_registry()
+    logger.info(f"Using LLM backend preference: {settings.llm_backend}")
     
     # Connect analytics to tool registry
     tool_registry.set_analytics(collector)
@@ -184,6 +194,7 @@ async def run_chat_loop():
             
             # Record user message
             collector.record_user_message(user_input)
+            logger.info(f"User message: {user_input[:100]}...")
             
             # Check for resolution signal
             if detect_resolution_signal(user_input):
@@ -196,11 +207,14 @@ async def run_chat_loop():
             console.print("\n[dim]Thinking...[/dim]")
 
             tools = tool_registry.get_all_definitions()
+            logger.debug(f"Available tools: {[t.name for t in tools]}")
+            
             response = await llm_router.chat(
                 messages=messages,
                 tools=tools,
                 temperature=0.3,
             )
+            logger.debug(f"LLM response has_tool_calls: {response.has_tool_calls}")
             
             # Set backend info after first LLM call
             if first_message and llm_router.active_backend:
@@ -214,14 +228,17 @@ async def run_chat_loop():
             # Handle tool calls
             if response.has_tool_calls and response.message.tool_calls:
                 messages.append(response.message)
+                logger.info(f"LLM requested {len(response.message.tool_calls)} tool call(s)")
 
                 for tool_call in response.message.tool_calls:
+                    logger.info(f"Executing tool: {tool_call.name} with args: {tool_call.arguments}")
                     console.print(
                         f"\n[yellow]Running:[/yellow] {tool_call.name}"
                         f"({', '.join(f'{k}={v}' for k, v in tool_call.arguments.items())})"
                     )
 
                     result = await tool_registry.execute(tool_call)
+                    logger.debug(f"Tool result success: {result.success}")
 
                     # Show condensed result
                     if len(result.content) > 200:
@@ -278,6 +295,7 @@ async def run_chat_loop():
             break
 
         except Exception as e:
+            logger.exception(f"Error in chat loop: {e}")
             console.print(f"\n[red]Error:[/red] {e}")
             if settings.debug:
                 console.print_exception()

@@ -1,5 +1,6 @@
 """LLM router for managing multiple backends."""
 
+import logging
 import time
 from typing import TYPE_CHECKING, Literal
 
@@ -11,6 +12,8 @@ from .openai_client import OpenAIClient
 
 if TYPE_CHECKING:
     from analytics import AnalyticsCollector
+
+logger = logging.getLogger("network_diag.llm.router")
 
 
 class LLMRouter:
@@ -81,15 +84,19 @@ class LLMRouter:
 
         # Try preferred backend first
         if self.preferred == "ollama":
+            logger.debug("Checking Ollama availability...")
             if await self.ollama.is_available():
+                logger.info(f"Using Ollama backend with model: {self.ollama.model_name}")
                 self._active = self.ollama
                 return self._active
 
             # Fallback to OpenAI
+            logger.warning("Ollama not available, trying OpenAI fallback...")
             if self.openai and await self.openai.is_available():
                 self._had_fallback = True
                 self._fallback_from = "ollama"
                 self._active = self.openai
+                logger.info(f"Fell back to OpenAI with model: {self.openai.model_name}")
                 # Record fallback in analytics
                 if self._analytics:
                     self._analytics.record_fallback(
@@ -144,8 +151,16 @@ class LLMRouter:
         
         # Track timing for analytics
         start_time = time.perf_counter()
-        response = await client.chat(messages, tools, temperature)
+        logger.debug(f"Sending chat request with {len(messages)} messages, {len(tools) if tools else 0} tools")
+        
+        try:
+            response = await client.chat(messages, tools, temperature)
+        except Exception as e:
+            logger.error(f"LLM chat failed: {e}")
+            raise
+            
         duration_ms = int((time.perf_counter() - start_time) * 1000)
+        logger.info(f"LLM response received in {duration_ms}ms, has_tool_calls={response.has_tool_calls}")
         
         # Record in analytics if available
         if self._analytics:

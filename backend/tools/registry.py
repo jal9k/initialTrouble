@@ -1,6 +1,7 @@
 """Tool registry for managing diagnostic functions."""
 
 import inspect
+import logging
 import time
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
@@ -10,6 +11,7 @@ from .schemas import ToolCall, ToolDefinition, ToolParameter, ToolResult
 if TYPE_CHECKING:
     from analytics import AnalyticsCollector
 
+logger = logging.getLogger("network_diag.tools.registry")
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -51,6 +53,7 @@ class ToolRegistry:
                 description=description,
                 parameters=parameters or [],
             )
+            logger.debug(f"Registered tool: {name}")
             return func
 
         return decorator
@@ -86,8 +89,10 @@ class ToolRegistry:
             ToolResult with execution result
         """
         tool = self.get_tool(tool_call.name)
+        logger.info(f"Executing tool: {tool_call.name} with args: {tool_call.arguments}")
 
         if tool is None:
+            logger.error(f"Unknown tool requested: {tool_call.name}")
             # Record failed tool call in analytics
             if self._analytics:
                 self._analytics.record_tool_call(
@@ -129,9 +134,11 @@ class ToolRegistry:
             success = False
             error_message = str(e)
             content = f"Error executing tool: {error_message}"
+            logger.exception(f"Tool {tool_call.name} failed with error: {e}")
 
         # Calculate duration
         duration_ms = int((time.perf_counter() - start_time) * 1000)
+        logger.info(f"Tool {tool_call.name} completed in {duration_ms}ms, success={success}")
 
         # Record in analytics
         if self._analytics:

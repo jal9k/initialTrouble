@@ -197,6 +197,13 @@ Each component must pass these gates before implementation continues:
 - [ ] Test specifications written
 - [ ] **GATE: Full build + All tests pass**
 
+### home-page.md
+- [ ] Document created
+- [ ] Redirect or landing page specified
+- [ ] Navigation links documented
+- [ ] Test specifications written
+- [ ] **GATE: Full build + All tests pass**
+
 ---
 
 ## Summary Progress
@@ -210,8 +217,8 @@ Each component must pass these gates before implementation continues:
 | 5. Chat | 3 | 0 | ⚪ Pending |
 | 6. Diagnostics | 3 | 0 | ⚪ Pending |
 | 7. Analytics | 3 | 0 | ⚪ Pending |
-| 8. Pages | 3 | 0 | ⚪ Pending |
-| **Total** | **22** | **1** | |
+| 8. Pages | 4 | 0 | ⚪ Pending |
+| **Total** | **23** | **1** | |
 
 ---
 
