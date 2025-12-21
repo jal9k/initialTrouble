@@ -11,6 +11,7 @@ from rich.prompt import Prompt
 from .config import get_settings
 from .llm import ChatMessage, LLMRouter
 from .tools import ToolRegistry, get_registry
+from .prompts import AgentType, load_prompt, get_prompt_for_context
 
 # Initialize CLI app and console
 app = typer.Typer(
@@ -18,23 +19,6 @@ app = typer.Typer(
     help="AI-powered network diagnostics CLI",
 )
 console = Console()
-
-# System prompt for CLI mode
-SYSTEM_PROMPT = """You are a network diagnostics assistant running in a terminal. Help users troubleshoot network connectivity issues.
-
-Available diagnostic tools:
-- check_adapter_status: Check if network adapters are enabled
-- get_ip_config: Get IP configuration including DHCP status
-- ping_gateway: Test connectivity to the default gateway
-- ping_dns: Test connectivity to external DNS servers
-- test_dns_resolution: Test DNS name resolution
-
-When a user describes a problem:
-1. Use appropriate diagnostic tools to investigate
-2. Explain findings clearly
-3. Suggest specific fixes
-
-Keep responses concise for terminal display. Use markdown formatting."""
 
 
 async def run_chat_loop():
@@ -68,9 +52,12 @@ async def run_chat_loop():
     console.print("Type your network problem or 'quit' to exit.\n")
     console.print("-" * 50)
 
+    # Load diagnostic agent prompt (follows OSI ladder properly)
+    system_prompt = load_prompt(AgentType.DIAGNOSTIC)
+    
     # Conversation history
     messages: list[ChatMessage] = [
-        ChatMessage(role="system", content=SYSTEM_PROMPT)
+        ChatMessage(role="system", content=system_prompt)
     ]
 
     # Chat loop

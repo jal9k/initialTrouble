@@ -273,7 +273,8 @@ class GetIPConfig(BaseDiagnostic):
                     "subnet_mask": None,  # Would need prefix length conversion
                     "gateway": gateway_obj.get("NextHop"),
                     "dns_servers": [
-                        d.get("ServerAddresses", []) for d in dns_obj if d
+                        addr for d in dns_obj if d
+                        for addr in (d.get("ServerAddresses") or [])
                     ],
                     "dhcp_enabled": True,
                     "dhcp_server": None,

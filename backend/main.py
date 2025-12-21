@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from .config import get_settings
 from .llm import ChatMessage, LLMRouter
 from .tools import ToolRegistry, get_registry
+from .prompts import AgentType, load_prompt
 
 
 # Request/Response models
@@ -120,10 +121,12 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
     # Get or create conversation
     conv_id = request.conversation_id or str(uuid.uuid4())
     if conv_id not in state.conversations:
+        # Use diagnostic agent prompt (follows OSI ladder properly)
+        system_prompt = load_prompt(AgentType.DIAGNOSTIC)
         state.conversations[conv_id] = [
             ChatMessage(
                 role="system",
-                content=SYSTEM_PROMPT,
+                content=system_prompt,
             )
         ]
 
@@ -206,30 +209,5 @@ async def websocket_endpoint(websocket: WebSocket):
         pass
 
 
-# System prompt for the diagnostic assistant
-SYSTEM_PROMPT = """You are a network diagnostics assistant. Your job is to help users troubleshoot network connectivity issues.
-
-You have access to diagnostic tools that can check various aspects of network connectivity:
-- check_adapter_status: Check if network adapters are enabled
-- get_ip_config: Get IP configuration including DHCP status
-- ping_gateway: Test connectivity to the default gateway
-- ping_dns: Test connectivity to external DNS servers
-- test_dns_resolution: Test DNS name resolution
-
-When a user describes a network problem:
-1. Start with the most likely issue based on their description
-2. Use the diagnostic tools to gather information
-3. Interpret the results and explain what they mean
-4. Suggest specific fixes based on findings
-5. If needed, run additional diagnostics to narrow down the issue
-
-Follow the OSI model diagnostic ladder when systematic troubleshooting is needed:
-1. Physical/Link layer (adapter status)
-2. Network layer local (IP config)
-3. Network layer gateway (ping gateway)
-4. Network layer external (ping DNS servers)
-5. Application layer (DNS resolution)
-
-Be concise but thorough. Explain technical concepts in simple terms when possible."""
 
 

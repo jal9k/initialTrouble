@@ -29,6 +29,7 @@ def register_all_diagnostics(registry) -> None:
     from .ip_config import get_ip_config
     from .connectivity import ping_gateway, ping_dns
     from .dns import test_dns_resolution
+    from .wifi import enable_wifi
 
     # Register check_adapter_status
     registry.register(
@@ -117,4 +118,21 @@ def register_all_diagnostics(registry) -> None:
             ),
         ],
     )(test_dns_resolution)
+
+    # Register enable_wifi
+    registry.register(
+        name="enable_wifi",
+        description="Enable the WiFi adapter. Use this when WiFi is disabled and needs to be turned on. "
+        "On macOS uses networksetup, on Windows uses netsh.",
+        parameters=[
+            ToolParameter(
+                name="interface_name",
+                type="string",
+                description="Specific WiFi interface to enable. "
+                "macOS default: en0, Windows default: Wi-Fi. "
+                "Only specify if the default doesn't work.",
+                required=False,
+            ),
+        ],
+    )(enable_wifi)
 
