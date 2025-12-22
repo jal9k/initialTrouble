@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from .config import get_settings
 from .llm import ChatMessage, LLMRouter
 from .tools import ToolRegistry, get_registry
+from .tools.api import create_tools_router
 from .prompts import AgentType, load_prompt
 
 # Import analytics
@@ -96,6 +97,9 @@ async def lifespan(app: FastAPI):
     # Register analytics API routes
     app.include_router(create_analytics_router(state.analytics_storage))
     app.include_router(create_feedback_router(state.analytics_storage))
+    
+    # Register tools API routes
+    app.include_router(create_tools_router(state.tool_registry))
 
     yield
 
@@ -142,6 +146,13 @@ async def health_check() -> HealthResponse:
 async def chat(request: ChatRequest) -> ChatResponseModel:
     """Send a message and get AI-powered diagnostics response."""
     import uuid
+    import json
+    import time
+    # #region agent log
+    def _dbg(loc: str, msg: str, data: dict, hyp: str = "BACKEND"):
+        with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as f:
+            f.write(json.dumps({"location": loc, "message": msg, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session", "hypothesisId": hyp}) + "\n")
+    # #endregion
 
     if not state.llm_router or not state.tool_registry:
         raise RuntimeError("Application not initialized")
@@ -177,11 +188,19 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
 
     # Get LLM response with tools
     tools = state.tool_registry.get_all_definitions()
+    # #region agent log
+    _dbg("main.py:chat:before_llm", "Sending chat with tools", {"tool_count": len(tools), "tools": [t.name for t in tools], "message_count": len(state.conversations[conv_id])}, "H-A")
+    # #endregion
     response = await state.llm_router.chat(
         messages=state.conversations[conv_id],
         tools=tools,
         temperature=0.3,
     )
+    # #region agent log
+    _dbg("main.py:chat:after_llm", "LLM response received", {"has_tool_calls": response.has_tool_calls, "content_len": len(response.content) if response.content else 0}, "H-B")
+    if response.has_tool_calls and response.message.tool_calls:
+        _dbg("main.py:chat:tool_calls", "Tool calls found", {"tool_names": [tc.name for tc in response.message.tool_calls]}, "H-B")
+    # #endregion
     
     # Update session with backend info after first LLM call
     if is_new_conversation and state.llm_router.active_backend:
@@ -194,11 +213,20 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
     # Handle tool calls
     tool_results = []
     if response.has_tool_calls and response.message.tool_calls:
+        # #region agent log
+        _dbg("main.py:chat:processing_tools", "Processing tool calls", {"count": len(response.message.tool_calls)}, "H-C")
+        # #endregion
         # Add assistant message with tool_calls to conversation first
         state.conversations[conv_id].append(response.message)
         
         for tool_call in response.message.tool_calls:
+            # #region agent log
+            _dbg("main.py:chat:execute_tool", "Executing tool", {"name": tool_call.name, "arguments": str(tool_call.arguments)}, "H-C")
+            # #endregion
             result = await state.tool_registry.execute(tool_call)
+            # #region agent log
+            _dbg("main.py:chat:tool_result", "Tool result", {"name": tool_call.name, "success": result.success}, "H-C")
+            # #endregion
             tool_results.append(
                 {
                     "name": tool_call.name,
@@ -238,12 +266,25 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time chat."""
+    import json
+    import time
+    # #region agent log
+    def _ws_dbg(loc: str, msg: str, data: dict, hyp: str = "WS"):
+        with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as f:
+            f.write(json.dumps({"location": loc, "message": msg, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session", "hypothesisId": hyp}) + "\n")
+    # #endregion
     await websocket.accept()
+    # #region agent log
+    _ws_dbg("main.py:ws:accept", "WebSocket accepted", {}, "H-WS")
+    # #endregion
 
     try:
         while True:
             data = await websocket.receive_json()
             message = data.get("message", "")
+            # #region agent log
+            _ws_dbg("main.py:ws:received", "Received message", {"message_len": len(message), "has_conv_id": "conversation_id" in data}, "H-WS")
+            # #endregion
 
             # Create request and get response
             request = ChatRequest(
@@ -251,6 +292,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 conversation_id=data.get("conversation_id"),
             )
             response = await chat(request)
+            # #region agent log
+            _ws_dbg("main.py:ws:response", "Chat response ready", {"has_tool_calls": response.tool_calls is not None, "response_len": len(response.response) if response.response else 0}, "H-WS")
+            # #endregion
 
             await websocket.send_json(response.model_dump())
 

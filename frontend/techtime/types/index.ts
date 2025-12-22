@@ -68,7 +68,7 @@ export interface SessionListItem {
 
 export interface ToolParameter {
   name: string
-  type: 'string' | 'number' | 'boolean'
+  type: 'string' | 'number' | 'boolean' | 'array'
   description: string
   required: boolean
   default?: unknown
@@ -137,13 +137,13 @@ export const DIAGNOSTIC_LAYERS: OSILayer[] = [
     number: 4,
     name: 'DNS',
     description: 'DNS resolution capability',
-    tools: ['test_dns_resolution', 'ping_dns']
+    tools: ['test_dns_resolution']
   },
   {
     number: 5,
     name: 'Internet',
     description: 'External connectivity',
-    tools: ['ping_external']
+    tools: ['ping_dns']
   }
 ]
 
@@ -242,12 +242,14 @@ export interface MessageBubbleProps {
   message: Message
   isLatest?: boolean
   showTimestamp?: boolean
+  className?: string
 }
 
 export interface ToolExecutionCardProps {
   execution: ToolExecutionState
   onCancel?: () => void
   showDetails?: boolean
+  className?: string
 }
 
 export interface OSILadderVizProps {
@@ -255,6 +257,7 @@ export interface OSILadderVizProps {
   currentLayer?: number
   className?: string
   onLayerClick?: (layer: number) => void
+  showResults?: boolean
 }
 
 export interface ManualToolPanelProps {
@@ -269,11 +272,14 @@ export interface ToolCardProps {
   isExecuting: boolean
   onToggle: () => void
   onExecute: (params: Record<string, unknown>) => void
+  lastResult?: ToolResult
+  className?: string
 }
 
 export interface SummaryCardsProps {
   summary: SessionSummary
   isLoading?: boolean
+  className?: string
 }
 
 export interface SessionsChartProps {
@@ -299,6 +305,7 @@ export interface SidebarProps {
   onSessionSelect: (sessionId: string) => void
   onNewSession: () => void
   isLoading?: boolean
+  className?: string
 }
 
 // ============================================================================

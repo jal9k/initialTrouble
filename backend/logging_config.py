@@ -62,3 +62,4 @@ def get_logger(name: str = "network_diag") -> logging.Logger:
     """Get a logger instance."""
     return logging.getLogger(name)
 
+

@@ -666,3 +666,4 @@ class AnalyticsStorage:
                 for row in cursor.fetchall()
             ]
 
+

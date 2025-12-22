@@ -365,3 +365,4 @@ class QualityMetrics(BaseModel):
     abandoned_sessions: int = 0
     drop_off_rate: float = 0.0  # Percentage of sessions abandoned
 
+

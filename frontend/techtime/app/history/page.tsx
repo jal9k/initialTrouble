@@ -1,54 +1,66 @@
-import { Skeleton } from '@/components/ui/skeleton'
-import { Card, CardContent } from '@/components/ui/card'
+import { HistoryPageClient } from './client'
 
 export const metadata = {
-  title: 'History - Network Diagnostics'
+  title: 'History - Network Diagnostics',
+  description: 'Browse past diagnostic sessions'
 }
+
+// Mock data - would be fetched from API
+const mockSessions = [
+  {
+    id: '1',
+    startTime: new Date(Date.now() - 1000 * 60 * 30),
+    outcome: 'resolved' as const,
+    preview: 'WiFi keeps disconnecting every few minutes. Need help troubleshooting.',
+    issueCategory: 'wifi' as const
+  },
+  {
+    id: '2',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    outcome: 'resolved' as const,
+    preview: 'Cannot access the internet, but local network works fine.',
+    issueCategory: 'connectivity' as const
+  },
+  {
+    id: '3',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 5),
+    outcome: 'unresolved' as const,
+    preview: 'DNS resolution failing intermittently.',
+    issueCategory: 'dns' as const
+  },
+  {
+    id: '4',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 24),
+    outcome: 'resolved' as const,
+    preview: 'No IP address being assigned to my computer.',
+    issueCategory: 'ip_config' as const
+  },
+  {
+    id: '5',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 48),
+    outcome: 'abandoned' as const,
+    preview: 'Slow network speeds when downloading files.',
+    issueCategory: 'connectivity' as const
+  },
+  {
+    id: '6',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 72),
+    outcome: 'resolved' as const,
+    preview: 'Cannot connect to work VPN.',
+    issueCategory: 'connectivity' as const
+  },
+  {
+    id: '7',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 96),
+    outcome: 'in_progress' as const,
+    preview: 'Network adapter keeps disabling itself.',
+    issueCategory: 'wifi' as const
+  }
+]
 
 export default function HistoryPage() {
-  return (
-    <div className="container py-6">
-      {/* Header */}
-      <div className="mb-6">
-        <Skeleton className="h-9 w-48 mb-2" />
-        <Skeleton className="h-4 w-64" />
-      </div>
+  // In a real app, you would fetch data here:
+  // const sessions = await listSessions({ pageSize: 50 })
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <Skeleton className="h-10 flex-1" />
-        <Skeleton className="h-10 w-40" />
-        <Skeleton className="h-10 w-40" />
-      </div>
-
-      {/* Session cards */}
-      <div className="space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Card key={i}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-full max-w-md" />
-                  <div className="flex gap-2">
-                    <Skeleton className="h-5 w-20" />
-                    <Skeleton className="h-5 w-16" />
-                  </div>
-                </div>
-                <Skeleton className="h-8 w-24" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Pagination */}
-      <div className="flex justify-between mt-6">
-        <Skeleton className="h-10 w-24" />
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-10 w-24" />
-      </div>
-    </div>
-  )
+  return <HistoryPageClient sessions={mockSessions} />
 }
-

@@ -1,12 +1,19 @@
 """Ollama LLM client implementation."""
 
 import json
+import time
 from typing import Any
 
 import httpx
 
 from ..tools.schemas import ToolCall, ToolDefinition
 from .base import BaseLLMClient, ChatMessage, ChatResponse
+
+# #region agent log
+def _ollama_dbg(loc: str, msg: str, data: dict, hyp: str = "OLLAMA"):
+    with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as f:
+        f.write(json.dumps({"location": loc, "message": msg, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session", "hypothesisId": hyp}) + "\n")
+# #endregion
 
 
 class OllamaClient(BaseLLMClient):
@@ -67,6 +74,10 @@ class OllamaClient(BaseLLMClient):
         if tools:
             payload["tools"] = [t.to_ollama_schema() for t in tools]
 
+        # #region agent log
+        _ollama_dbg("ollama:chat:request", "Sending to Ollama", {"model": self.model, "msg_count": len(ollama_messages), "has_tools": tools is not None, "tool_count": len(tools) if tools else 0, "tool_names": [t.name for t in tools] if tools else []}, "H-OLLAMA")
+        # #endregion
+
         # Make request
         response = await self._client.post(
             f"{self.host}/api/chat",
@@ -76,6 +87,11 @@ class OllamaClient(BaseLLMClient):
 
         data = response.json()
         message_data = data.get("message", {})
+        # #region agent log
+        _ollama_dbg("ollama:chat:response", "Ollama response received", {"has_tool_calls": "tool_calls" in message_data, "content_len": len(message_data.get("content", "")) if message_data.get("content") else 0, "done_reason": data.get("done_reason")}, "H-OLLAMA")
+        if "tool_calls" in message_data:
+            _ollama_dbg("ollama:chat:tool_calls", "Tool calls in response", {"tool_calls": message_data["tool_calls"]}, "H-OLLAMA")
+        # #endregion
 
         # Parse tool calls if present
         tool_calls = None

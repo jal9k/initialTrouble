@@ -4,15 +4,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { Moon, Sun, Menu } from 'lucide-react'
+import { Moon, Sun, Menu, Wifi, WifiOff } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useWebSocket } from '@/hooks/use-websocket'
 import type { HeaderProps } from '@/types'
 
 const navItems = [
@@ -24,6 +24,7 @@ const navItems = [
 export function Header({ className }: HeaderProps) {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
+  const { isConnected, isConnecting } = useWebSocket()
 
   return (
     <header
@@ -60,8 +61,16 @@ export function Header({ className }: HeaderProps) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Connection Status - Skeleton until WebSocket hook exists */}
-          <Skeleton className="h-4 w-4 rounded-full" />
+          {/* Connection Status */}
+          <div className="flex items-center gap-1 text-sm">
+            {isConnected ? (
+              <Wifi className="h-4 w-4 text-green-500" />
+            ) : isConnecting ? (
+              <Wifi className="h-4 w-4 text-yellow-500 animate-pulse" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-red-500" />
+            )}
+          </div>
 
           {/* Theme Toggle */}
           <Button
@@ -95,4 +104,3 @@ export function Header({ className }: HeaderProps) {
     </header>
   )
 }
-
