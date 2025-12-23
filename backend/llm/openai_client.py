@@ -22,6 +22,7 @@ class OpenAIClient(BaseLLMClient):
         messages: list[ChatMessage],
         tools: list[ToolDefinition] | None = None,
         temperature: float = 0.7,
+        tool_choice: str | dict | None = "auto",
     ) -> ChatResponse:
         """Send chat completion request to OpenAI."""
         # Convert messages to OpenAI format
@@ -65,7 +66,8 @@ class OpenAIClient(BaseLLMClient):
         # Add tools if provided
         if tools:
             kwargs["tools"] = [t.to_openai_schema() for t in tools]
-            kwargs["tool_choice"] = "auto"
+            if tool_choice is not None:
+                kwargs["tool_choice"] = tool_choice
 
         # Make request
         response = await self._client.chat.completions.create(**kwargs)

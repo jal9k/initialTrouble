@@ -65,6 +65,7 @@ class BaseLLMClient(ABC):
         messages: list[ChatMessage],
         tools: list[ToolDefinition] | None = None,
         temperature: float = 0.7,
+        tool_choice: str | dict | None = "auto",
     ) -> ChatResponse:
         """
         Send a chat completion request.
@@ -73,6 +74,11 @@ class BaseLLMClient(ABC):
             messages: Conversation history
             tools: Available tools for function calling
             temperature: Sampling temperature
+            tool_choice: Tool calling behavior:
+                - "auto": Model decides whether to call tools (default)
+                - "required": Model MUST call at least one tool
+                - "none": Model cannot call tools
+                - {"type": "function", "function": {"name": "..."}}: Force specific tool
 
         Returns:
             ChatResponse with LLM's response

@@ -88,6 +88,14 @@ class ToolRegistry:
         Returns:
             ToolResult with execution result
         """
+        # #region debug
+        from ..logging_config import debug_log
+        debug_log("ToolRegistry", f"Executing tool: {tool_call.name}", {
+            "arguments": tool_call.arguments,
+            "tool_call_id": tool_call.id,
+        })
+        # #endregion
+        
         tool = self.get_tool(tool_call.name)
         logger.info(f"Executing tool: {tool_call.name} with args: {tool_call.arguments}")
 
@@ -139,6 +147,16 @@ class ToolRegistry:
         # Calculate duration
         duration_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info(f"Tool {tool_call.name} completed in {duration_ms}ms, success={success}")
+        
+        # #region debug
+        from ..logging_config import debug_log
+        debug_log("ToolRegistry", f"Tool completed: {tool_call.name}", {
+            "success": success,
+            "duration_ms": duration_ms,
+            "content_length": len(content),
+            "error": error_message,
+        })
+        # #endregion
 
         # Record in analytics
         if self._analytics:

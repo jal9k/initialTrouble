@@ -30,6 +30,7 @@ class OllamaClient(BaseLLMClient):
         messages: list[ChatMessage],
         tools: list[ToolDefinition] | None = None,
         temperature: float = 0.7,
+        tool_choice: str | dict | None = "auto",
     ) -> ChatResponse:
         """Send chat completion request to Ollama."""
         # Convert messages to Ollama format
@@ -73,9 +74,22 @@ class OllamaClient(BaseLLMClient):
         # Add tools if provided
         if tools:
             payload["tools"] = [t.to_ollama_schema() for t in tools]
+            
+            # #region debug
+            # Workaround: Ollama doesn't fully support tool_choice, so inject instruction
+            if tool_choice == "required":
+                self._inject_force_tool_instruction(ollama_messages)
+                # Update payload with modified messages
+                payload["messages"] = ollama_messages
+            elif isinstance(tool_choice, dict) and tool_choice.get("type") == "function":
+                tool_name = tool_choice.get("function", {}).get("name")
+                if tool_name:
+                    self._inject_specific_tool_instruction(ollama_messages, tool_name)
+                    payload["messages"] = ollama_messages
+            # #endregion
 
         # #region agent log
-        _ollama_dbg("ollama:chat:request", "Sending to Ollama", {"model": self.model, "msg_count": len(ollama_messages), "has_tools": tools is not None, "tool_count": len(tools) if tools else 0, "tool_names": [t.name for t in tools] if tools else []}, "H-OLLAMA")
+        _ollama_dbg("ollama:chat:request", "Sending to Ollama", {"model": self.model, "msg_count": len(ollama_messages), "has_tools": tools is not None, "tool_count": len(tools) if tools else 0, "tool_names": [t.name for t in tools] if tools else [], "tool_choice": str(tool_choice)}, "H-OLLAMA")
         # #endregion
 
         # Make request
@@ -147,4 +161,39 @@ class OllamaClient(BaseLLMClient):
     async def close(self):
         """Close the HTTP client."""
         await self._client.aclose()
+
+    # #region debug
+    def _inject_force_tool_instruction(self, messages: list[dict]) -> None:
+        """
+        Inject instruction to force tool calling (Ollama workaround).
+        
+        Ollama doesn't fully support tool_choice="required", so we append
+        an instruction to the last user message to encourage tool usage.
+        """
+        for i in range(len(messages) - 1, -1, -1):
+            if messages[i].get("role") == "user":
+                original = messages[i].get("content", "")
+                messages[i]["content"] = (
+                    f"{original}\n\n"
+                    "[INSTRUCTION: You MUST respond with a tool call. "
+                    "Do not write any text explanation. Only output a tool call.]"
+                )
+                break
+
+    def _inject_specific_tool_instruction(self, messages: list[dict], tool_name: str) -> None:
+        """
+        Inject instruction to call a specific tool.
+        
+        Used when tool_choice specifies a particular function.
+        """
+        for i in range(len(messages) - 1, -1, -1):
+            if messages[i].get("role") == "user":
+                original = messages[i].get("content", "")
+                messages[i]["content"] = (
+                    f"{original}\n\n"
+                    f"[INSTRUCTION: You MUST call the {tool_name} tool. "
+                    "Do not write any text. Only output the tool call.]"
+                )
+                break
+    # #endregion
 

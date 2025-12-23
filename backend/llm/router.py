@@ -135,6 +135,7 @@ class LLMRouter:
         messages: list[ChatMessage],
         tools: list[ToolDefinition] | None = None,
         temperature: float = 0.7,
+        tool_choice: str | dict | None = "auto",
     ) -> ChatResponse:
         """
         Send chat completion request to best available backend.
@@ -143,6 +144,7 @@ class LLMRouter:
             messages: Conversation history
             tools: Available tools for function calling
             temperature: Sampling temperature
+            tool_choice: Tool calling behavior ("auto", "required", "none", or specific tool)
 
         Returns:
             ChatResponse from LLM
@@ -153,14 +155,35 @@ class LLMRouter:
         start_time = time.perf_counter()
         logger.debug(f"Sending chat request with {len(messages)} messages, {len(tools) if tools else 0} tools")
         
+        # #region debug
+        from ..logging_config import debug_log
+        debug_log("LLMRouter", "Sending chat request", {
+            "message_count": len(messages),
+            "tool_count": len(tools) if tools else 0,
+            "tool_choice": str(tool_choice),
+            "backend": self.active_backend,
+            "model": self.active_model,
+        })
+        # #endregion
+        
         try:
-            response = await client.chat(messages, tools, temperature)
+            response = await client.chat(messages, tools, temperature, tool_choice=tool_choice)
         except Exception as e:
             logger.error(f"LLM chat failed: {e}")
             raise
             
         duration_ms = int((time.perf_counter() - start_time) * 1000)
         logger.info(f"LLM response received in {duration_ms}ms, has_tool_calls={response.has_tool_calls}")
+        
+        # #region debug
+        debug_log("LLMRouter", "Response received", {
+            "has_tool_calls": response.has_tool_calls,
+            "tool_call_count": len(response.message.tool_calls) if response.message.tool_calls else 0,
+            "content_length": len(response.content) if response.content else 0,
+            "duration_ms": duration_ms,
+            "finish_reason": response.finish_reason,
+        })
+        # #endregion
         
         # Record in analytics if available
         if self._analytics:
