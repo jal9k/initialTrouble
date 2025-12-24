@@ -1,8 +1,8 @@
 import { ChatPageClient } from './client'
 
 export const metadata = {
-  title: 'Chat - Network Diagnostics',
-  description: 'AI-powered network troubleshooting'
+  title: 'Chat - TechTim(e)',
+  description: 'AI-powered L1 desktop support'
 }
 
 // Mock data for now - would be fetched from API

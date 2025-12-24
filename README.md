@@ -1,19 +1,23 @@
-# Network Diagnostics Troubleshooter
+# TechTim(e)
 
-An intelligent, cross-platform network diagnostics tool that uses LLM reasoning (Ollama/OpenAI) to diagnose and troubleshoot network connectivity issues.
+An intelligent, cross-platform L1 desktop support tool that uses LLM reasoning (Ollama/OpenAI) to diagnose and troubleshoot IT issues.
 
 ## Features
 
-- **LLM-Powered Reasoning**: Uses Ministral 3B (via Ollama) or OpenAI GPT models to intelligently diagnose network issues
+- **LLM-Powered Reasoning**: Uses Ministral 3B (via Ollama) or OpenAI GPT models to intelligently diagnose issues
 - **Cross-Platform**: Works on both macOS and Windows
 - **Multiple Interfaces**: CLI for terminal users, Web UI for graphical interaction
-- **Systematic Diagnostics**: Follows the OSI model ladder for thorough troubleshooting
+- **Systematic Diagnostics**: Follows structured troubleshooting for thorough problem resolution
 
 ## Quick Start
 
 ### 1. Activate the Environment
 
 ```bash
+# Future environment name (after recreating)
+conda activate techtime
+
+# Current environment (if not yet migrated)
 conda activate network-diag
 ```
 
@@ -63,4 +67,3 @@ The LLM receives your problem description, decides which diagnostic functions to
 ## License
 
 MIT
-

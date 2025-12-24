@@ -1,8 +1,8 @@
 import { HistoryPageClient } from './client'
 
 export const metadata = {
-  title: 'History - Network Diagnostics',
-  description: 'Browse past diagnostic sessions'
+  title: 'History - TechTim(e)',
+  description: 'Browse past support sessions'
 }
 
 // Mock data - would be fetched from API

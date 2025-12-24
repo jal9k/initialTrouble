@@ -1,6 +1,6 @@
-Next.js Frontend for Network Diagnostics
+Next.js Frontend for TechTime
 Overview
-Build a modern Next.js frontend with two main sections: an AI-powered chat interface for network troubleshooting, and an analytics dashboard for monitoring sessions and tool performance.
+Build a modern Next.js frontend with two main sections: an AI-powered chat interface for L1 desktop support, and an analytics dashboard for monitoring sessions and tool performance.
 
 Architecture
 Python Backend - Port 8000

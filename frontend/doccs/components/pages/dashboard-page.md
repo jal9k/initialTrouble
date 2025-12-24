@@ -128,8 +128,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const metadata = {
-  title: 'Dashboard - Network Diagnostics',
-  description: 'Analytics overview for network diagnostics'
+  title: 'Dashboard - TechTime',
+  description: 'Analytics overview for TechTime'
 }
 
 // Revalidate every 5 minutes
@@ -178,7 +178,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            Analytics overview for network diagnostics
+            Analytics overview for TechTime
           </p>
         </div>
         <DateRangePicker />

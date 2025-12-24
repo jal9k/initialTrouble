@@ -1,4 +1,4 @@
-# System Prompts for Network Diagnostics
+# System Prompts for TechTime
 
 This directory contains specialized system prompts for different diagnostic agents, optimized for [Ministral-3](https://ollama.com/library/ministral-3).
 

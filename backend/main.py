@@ -1,4 +1,4 @@
-"""FastAPI entry point for Network Diagnostics API."""
+"""FastAPI entry point for TechTime API."""
 
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -110,8 +110,8 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="Network Diagnostics API",
-    description="AI-powered network troubleshooting API",
+    title="TechTime API",
+    description="AI-powered L1 desktop support API",
     version="0.1.0",
     lifespan=lifespan,
 )

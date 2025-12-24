@@ -1,6 +1,6 @@
 # Headless Component Architecture
 
-This guide establishes the headless component patterns used throughout the Network Diagnostics frontend. Headless components separate logic from presentation, enabling maximum reusability.
+This guide establishes the headless component patterns used throughout the TechTime frontend. Headless components separate logic from presentation, enabling maximum reusability.
 
 ## Overview
 

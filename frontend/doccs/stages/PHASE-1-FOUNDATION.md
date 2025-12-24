@@ -7,7 +7,7 @@ Project setup, TypeScript interfaces, and base configuration.
 ## Step 1: Initialize Next.js Project
 Verify build its already created just make sure its created. 
 ```bash
-cd /Users/tyurgal/Documents/python/diag/network-diag/frontend/techtime
+cd /Users/tyurgal/Documents/python/diag/techtime/frontend/techtime
 
 # Create Next.js app with TypeScript
 npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir=false --import-alias="@/*"
@@ -428,7 +428,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Network Diagnostics',
+  title: 'TechTime',
   description: 'AI-powered network troubleshooting assistant'
 }
 
@@ -525,7 +525,7 @@ export function Header({ className }: { className?: string }) {
       <div className="container flex h-14 items-center">
         {/* Logo */}
         <Link href="/" className="mr-6 flex items-center space-x-2">
-          <span className="font-bold">Network Diag</span>
+          <span className="font-bold">TechTim(e)</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -597,7 +597,7 @@ Create `app/chat/page.tsx`:
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const metadata = {
-  title: 'Chat - Network Diagnostics'
+  title: 'Chat - TechTime'
 }
 
 export default function ChatPage() {
@@ -657,7 +657,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
 export const metadata = {
-  title: 'Dashboard - Network Diagnostics'
+  title: 'Dashboard - TechTime'
 }
 
 export default function DashboardPage() {
@@ -728,7 +728,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
 
 export const metadata = {
-  title: 'History - Network Diagnostics'
+  title: 'History - TechTime'
 }
 
 export default function HistoryPage() {

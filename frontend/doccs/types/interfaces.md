@@ -1,6 +1,6 @@
 # TypeScript Interfaces
 
-This document defines all TypeScript interfaces used throughout the Network Diagnostics frontend. All interfaces should be defined in `types/index.ts` and exported for use across components.
+This document defines all TypeScript interfaces used throughout the TechTime frontend. All interfaces should be defined in `types/index.ts` and exported for use across components.
 
 ## File Location
 

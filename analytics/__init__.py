@@ -1,4 +1,4 @@
-"""Analytics module for Network Diagnostics.
+"""Analytics module for TechTime.
 
 This module provides comprehensive analytics tracking including:
 - Token usage and response timing

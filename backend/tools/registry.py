@@ -11,7 +11,7 @@ from .schemas import ToolCall, ToolDefinition, ToolParameter, ToolResult
 if TYPE_CHECKING:
     from analytics import AnalyticsCollector
 
-logger = logging.getLogger("network_diag.tools.registry")
+logger = logging.getLogger("techtime.tools.registry")
 F = TypeVar("F", bound=Callable[..., Any])
 
 

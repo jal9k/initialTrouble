@@ -13,7 +13,7 @@ from .openai_client import OpenAIClient
 if TYPE_CHECKING:
     from analytics import AnalyticsCollector
 
-logger = logging.getLogger("network_diag.llm.router")
+logger = logging.getLogger("techtime.llm.router")
 
 
 class LLMRouter:

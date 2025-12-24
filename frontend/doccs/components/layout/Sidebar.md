@@ -1,6 +1,6 @@
 # Sidebar Component
 
-This document specifies the Sidebar component for the Network Diagnostics application.
+This document specifies the Sidebar component for the TechTime application.
 
 ## File Location
 

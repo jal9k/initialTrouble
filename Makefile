@@ -1,5 +1,5 @@
-# Network Diagnostics - Makefile
-# Manages both backend (Python/FastAPI) and frontend (Next.js/techtime)
+# TechTime - Makefile
+# Manages both backend (Python/FastAPI) and frontend (Next.js)
 
 .PHONY: help install install-backend install-frontend \
         dev dev-backend dev-frontend \
@@ -114,12 +114,12 @@ format: ## Format backend Python code
 
 ##@ CLI
 
-cli: ## Run the network-diag CLI
+cli: ## Run the TechTime CLI
 	@python -m backend.cli
 
 cli-install: ## Install the CLI tool globally
 	pip install -e .
-	@echo "${GREEN}✓ CLI installed. Run 'network-diag' to use.${NC}"
+	@echo "${GREEN}✓ CLI installed. Run 'techtime' to use.${NC}"
 
 ##@ Cleanup
 

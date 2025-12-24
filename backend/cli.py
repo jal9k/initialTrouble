@@ -1,4 +1,4 @@
-"""CLI interface for Network Diagnostics."""
+"""CLI interface for TechTime."""
 
 import asyncio
 import re
@@ -26,7 +26,7 @@ from .logging_config import debug_log, ResponseDiagnostics
 # #endregion
 
 # Initialize logging
-logger = get_logger("network_diag.cli")
+logger = get_logger("techtime.cli")
 
 # =============================================================================
 # CONSTANTS
@@ -40,8 +40,8 @@ ACTION_TOOLS = {"enable_wifi", "disable_wifi", "reset_network"}
 
 # Initialize CLI app and console
 app = typer.Typer(
-    name="network-diag",
-    help="AI-powered network diagnostics CLI",
+    name="techtime",
+    help="AI-powered L1 desktop support CLI",
 )
 console = Console()
 
@@ -375,7 +375,7 @@ async def run_chat_loop():
     register_all_diagnostics(tool_registry)
 
     # Check LLM availability
-    console.print("\n[bold blue]Network Diagnostics Assistant[/bold blue]")
+    console.print("\n[bold blue]TechTim(e) Support Assistant[/bold blue]")
     console.print("Checking LLM backends...\n")
 
     availability = await llm_router.is_available()
@@ -698,7 +698,7 @@ def ladder():
         else:
             console.print(
                 "[bold yellow]Some checks failed.[/bold yellow] "
-                "Run 'network-diag chat' for AI-assisted troubleshooting."
+                "Run 'techtime chat' for AI-assisted troubleshooting."
             )
 
     asyncio.run(run_ladder())

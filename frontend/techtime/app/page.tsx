@@ -12,14 +12,14 @@ export default function HomePage() {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
               <Zap className="h-4 w-4" />
-              AI-Powered Diagnostics
+              AI-Powered L1 Support
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
-              Network Diagnostics{' '}
+              Desktop Support{' '}
               <span className="text-primary">Made Simple</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Troubleshoot network issues with our intelligent assistant. 
+              Troubleshoot IT issues with our intelligent assistant. 
               Get instant diagnosis and step-by-step solutions powered by AI.
             </p>
           </div>
@@ -48,7 +48,7 @@ export default function HomePage() {
             <h2 className="text-3xl font-bold mb-4">How It Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Our intelligent system guides you through a systematic diagnostic process,
-              testing each layer of your network to identify issues quickly.
+              identifying issues quickly and providing step-by-step solutions.
             </p>
           </div>
 
@@ -60,7 +60,7 @@ export default function HomePage() {
                 </div>
                 <CardTitle>Describe Your Issue</CardTitle>
                 <CardDescription>
-                  Tell us about your network problem in plain English. 
+                  Tell us about your IT problem in plain English. 
                   Our AI understands context and symptoms.
                 </CardDescription>
               </CardHeader>
@@ -73,8 +73,8 @@ export default function HomePage() {
                 </div>
                 <CardTitle>Automated Testing</CardTitle>
                 <CardDescription>
-                  We run diagnostic tests on your network, from physical connections 
-                  to DNS resolution, identifying issues at each layer.
+                  We run diagnostic tests on your system, 
+                  identifying issues at each layer systematically.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -87,7 +87,7 @@ export default function HomePage() {
                 <CardTitle>Get Solutions</CardTitle>
                 <CardDescription>
                   Receive clear, actionable steps to resolve your issue. 
-                  Follow along as we guide you to a working network.
+                  Follow along as we guide you to resolution.
                 </CardDescription>
               </CardHeader>
             </Card>

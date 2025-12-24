@@ -111,10 +111,10 @@ export function ChatWindow({ className, ...chatOptions }: ExtendedChatWindowProp
             // Empty state
             <div className="flex flex-col items-center justify-center h-[60vh] text-center">
               <h2 className="text-xl font-semibold mb-2">
-                Network Diagnostics Assistant
+                TechTim(e) Support Assistant
               </h2>
               <p className="text-muted-foreground mb-6 max-w-md">
-                I can help diagnose and troubleshoot your network issues. 
+                I can help diagnose and troubleshoot your IT issues. 
                 Describe your problem or choose a common issue below.
               </p>
               <div className="grid grid-cols-2 gap-2 max-w-md">
@@ -204,7 +204,7 @@ export function ChatWindow({ className, ...chatOptions }: ExtendedChatWindowProp
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe your network issue..."
+            placeholder="Describe your issue..."
             disabled={isStreaming}
             className="min-h-[44px] max-h-32 resize-none"
             rows={1}

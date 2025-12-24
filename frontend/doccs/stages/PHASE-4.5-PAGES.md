@@ -36,7 +36,7 @@ import {
 import { MessageSquare, BarChart3, History, ArrowRight } from 'lucide-react'
 
 export const metadata = {
-  title: 'Network Diagnostics',
+  title: 'TechTime',
   description: 'AI-powered network troubleshooting assistant'
 }
 
@@ -67,7 +67,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold tracking-tight mb-4">
-          Network Diagnostics
+          TechTime
         </h1>
         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
           AI-powered troubleshooting for your network issues. Describe your
@@ -121,7 +121,7 @@ import { listSessions, listTools } from '@/lib/api'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const metadata = {
-  title: 'Chat - Network Diagnostics',
+  title: 'Chat - TechTime',
   description: 'AI-powered network troubleshooting'
 }
 
@@ -366,8 +366,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const metadata = {
-  title: 'Dashboard - Network Diagnostics',
-  description: 'Analytics overview for network diagnostics'
+  title: 'Dashboard - TechTime',
+  description: 'Analytics overview for TechTime'
 }
 
 export const revalidate = 300 // Revalidate every 5 minutes
@@ -493,7 +493,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            Analytics overview for network diagnostics
+            Analytics overview for TechTime
           </p>
         </div>
         <DateRangePicker className="w-40" />
@@ -563,7 +563,7 @@ import { HistoryClient } from './client'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const metadata = {
-  title: 'History - Network Diagnostics',
+  title: 'History - TechTime',
   description: 'Browse past diagnostic sessions'
 }
 

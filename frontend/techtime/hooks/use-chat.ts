@@ -62,7 +62,7 @@ export interface UseChatReturn {
 // Constants
 // ============================================================================
 
-const STORAGE_KEY = 'network_diag_chat'
+const STORAGE_KEY = 'techtime_chat'
 
 // ============================================================================
 // Hook Implementation

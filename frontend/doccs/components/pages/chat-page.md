@@ -100,7 +100,7 @@ import { ChatPageClient } from './client'
 import { listSessions, listTools } from '@/lib/api'
 
 export const metadata = {
-  title: 'Chat - Network Diagnostics',
+  title: 'Chat - TechTime',
   description: 'AI-powered network troubleshooting'
 }
 

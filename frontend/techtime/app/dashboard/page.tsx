@@ -121,7 +121,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Analytics and insights for your network diagnostics
+            Analytics and insights for your support sessions
           </p>
         </div>
         <DateRangePicker

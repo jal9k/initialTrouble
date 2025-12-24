@@ -110,7 +110,7 @@ export function ChatPageClient({
           onSessionSelect={handleSessionSelect}
           onNewSession={handleNewSession}
         />
-        <span className="text-sm font-medium">Network Diagnostics</span>
+        <span className="text-sm font-medium">TechTim(e)</span>
       </div>
 
       <div className="hidden md:flex h-full">

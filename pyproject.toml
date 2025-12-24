@@ -3,16 +3,16 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "network-diag"
+name = "techtime"
 version = "0.1.0"
-description = "AI-powered network diagnostics tool"
+description = "AI-powered L1 desktop support assistant"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "Network Diagnostics Team"}
+    {name = "TechTime Team"}
 ]
-keywords = ["network", "diagnostics", "troubleshooting", "ai", "llm"]
+keywords = ["desktop", "support", "troubleshooting", "ai", "llm", "l1", "helpdesk"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: System Administrators",
@@ -45,11 +45,11 @@ dev = [
 ]
 
 [project.scripts]
-network-diag = "backend.cli:main"
+techtime = "backend.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/example/network-diag"
-Documentation = "https://github.com/example/network-diag#readme"
+Homepage = "https://github.com/example/techtime"
+Documentation = "https://github.com/example/techtime#readme"
 
 [tool.setuptools.packages.find]
 where = ["."]

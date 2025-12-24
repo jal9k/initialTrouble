@@ -1,4 +1,4 @@
-"""Network diagnostic functions.
+"""Diagnostic functions for TechTime.
 
 Tool registration with decision-boundary descriptions for small language models.
 Each tool description includes CALL WHEN and DO NOT CALL conditions to help

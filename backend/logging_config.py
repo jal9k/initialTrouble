@@ -1,4 +1,4 @@
-"""Logging configuration for Network Diagnostics."""
+"""Logging configuration for TechTime."""
 
 import logging
 import sys
@@ -23,7 +23,7 @@ def setup_logging(
         Configured root logger
     """
     # Create logger
-    logger = logging.getLogger("network_diag")
+    logger = logging.getLogger("techtime")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     # Clear existing handlers
@@ -47,7 +47,7 @@ def setup_logging(
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # Daily log file
-        log_file = log_dir / f"network_diag_{datetime.now().strftime('%Y%m%d')}.log"
+        log_file = log_dir / f"techtime_{datetime.now().strftime('%Y%m%d')}.log"
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)  # All levels to file
         file_handler.setFormatter(formatter)
@@ -58,7 +58,7 @@ def setup_logging(
     return logger
 
 
-def get_logger(name: str = "network_diag") -> logging.Logger:
+def get_logger(name: str = "techtime") -> logging.Logger:
     """Get a logger instance."""
     return logging.getLogger(name)
 
@@ -77,7 +77,7 @@ def debug_log(prefix: str, message: str, data: Any = None) -> None:
     
     To remove all debug logging, search for '#region debug' and delete to '#endregion'.
     """
-    logger = get_logger("network_diag.debug")
+    logger = get_logger("techtime.debug")
     ts = datetime.now().strftime("%H:%M:%S")
     
     if data is not None:

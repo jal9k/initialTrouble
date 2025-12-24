@@ -1,4 +1,4 @@
-"""Configuration management for Network Diagnostics."""
+"""Configuration management for TechTime."""
 
 from functools import lru_cache
 from typing import Literal

@@ -1,4 +1,4 @@
-name: network-diag
+name: techtime
 channels:
   - conda-forge
   - defaults

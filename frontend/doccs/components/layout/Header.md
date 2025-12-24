@@ -1,6 +1,6 @@
 # Header Component
 
-This document specifies the Header component for the Network Diagnostics application.
+This document specifies the Header component for the TechTime application.
 
 ## File Location
 
@@ -177,7 +177,7 @@ export function Header({ className }: HeaderProps) {
       <div className="container flex h-14 items-center">
         {/* Logo */}
         <Link href="/" className="mr-6 flex items-center space-x-2">
-          <span className="font-bold">Network Diag</span>
+          <span className="font-bold">TechTim(e)</span>
         </Link>
 
         {/* Desktop Navigation */}

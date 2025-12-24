@@ -123,7 +123,7 @@ import { HistoryClient } from './client'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const metadata = {
-  title: 'History - Network Diagnostics',
+  title: 'History - TechTime',
   description: 'Browse past diagnostic sessions'
 }
 

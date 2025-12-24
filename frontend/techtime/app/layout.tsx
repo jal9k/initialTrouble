@@ -8,8 +8,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 
 export const metadata: Metadata = {
-  title: 'Network Diagnostics',
-  description: 'AI-powered network troubleshooting assistant'
+  title: 'TechTim(e)',
+  description: 'AI-powered L1 desktop support assistant'
 }
 
 export default function RootLayout({

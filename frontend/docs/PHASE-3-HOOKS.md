@@ -114,7 +114,7 @@ export function Header({ className }: HeaderProps) {
       <div className="container flex h-14 items-center">
         {/* Logo */}
         <Link href="/" className="mr-6 flex items-center space-x-2">
-          <span className="font-bold text-lg">Network Diag</span>
+          <span className="font-bold text-lg">TechTim(e)</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -909,7 +909,7 @@ export function ChatWindow({
             // Empty state
             <div className="flex flex-col items-center justify-center h-[60vh] text-center">
               <h2 className="text-xl font-semibold mb-2">
-                Network Diagnostics Assistant
+                TechTime Assistant
               </h2>
               <p className="text-muted-foreground mb-6 max-w-md">
                 I can help diagnose and troubleshoot your network issues.

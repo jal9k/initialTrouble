@@ -48,7 +48,7 @@ For a more polished experience, display a landing page with navigation options:
 │                                                                                 │
 │                    ┌─────────────────────────────────────┐                     │
 │                    │                                     │                     │
-│                    │     Network Diagnostics             │                     │
+│                    │     TechTime             │                     │
 │                    │     AI-Powered Troubleshooting      │                     │
 │                    │                                     │                     │
 │                    │     [Start New Session]             │                     │
@@ -83,7 +83,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { MessageSquare, BarChart3, History, ArrowRight } from 'lucide-react'
 
 export const metadata = {
-  title: 'Network Diagnostics',
+  title: 'TechTime',
   description: 'AI-powered network troubleshooting assistant'
 }
 
@@ -114,7 +114,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold tracking-tight mb-4">
-          Network Diagnostics
+          TechTime
         </h1>
         <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
           AI-powered troubleshooting for your network issues. 

@@ -590,7 +590,7 @@ export function ChatWindow({ className, ...chatOptions }: ChatWindowProps) {
             // Empty state
             <div className="flex flex-col items-center justify-center h-[60vh] text-center">
               <h2 className="text-xl font-semibold mb-2">
-                Network Diagnostics Assistant
+                TechTime Assistant
               </h2>
               <p className="text-muted-foreground mb-6 max-w-md">
                 I can help diagnose and troubleshoot your network issues.
