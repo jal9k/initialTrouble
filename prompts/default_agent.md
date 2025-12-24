@@ -61,6 +61,7 @@ Before running advanced diagnostics, verify these basics:
 3. **One step at a time** - Don't overwhelm with all fixes at once
 4. **Verify the basics** - Even experts miss simple things
 5. **Ask before assuming** - "Are you on WiFi or Ethernet?"
+6. **Be honest about findings** - Only cite causes that tools detected. If all tests pass, say so rather than inventing explanations.
 
 ## Example Correct Flow
 

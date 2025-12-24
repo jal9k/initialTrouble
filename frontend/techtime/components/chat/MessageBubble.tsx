@@ -7,6 +7,7 @@ import { cn, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Check, Copy, Zap } from 'lucide-react'
+import { ResponseDiagnosticsPanel } from './ResponseDiagnosticsPanel'
 import type { MessageBubbleProps } from '@/types'
 
 const roleStyles: Record<string, string> = {
@@ -20,6 +21,7 @@ export function MessageBubble({
   message,
   isLatest = false,
   showTimestamp = true,
+  showDiagnostics = true,
   className
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
@@ -127,6 +129,17 @@ export function MessageBubble({
       {message.toolCalls && message.toolCalls.length > 0 && (
         <div className="mt-2 text-xs text-muted-foreground">
           Used: {message.toolCalls.map(tc => tc.name).join(', ')}
+        </div>
+      )}
+
+      {/* Response Diagnostics Panel - only for assistant messages */}
+      {showDiagnostics && message.role === 'assistant' && message.diagnostics && (
+        <div className="w-full max-w-[80%]">
+          <ResponseDiagnosticsPanel
+            diagnostics={message.diagnostics}
+            verification={message.verification}
+            defaultExpanded={isLatest}
+          />
         </div>
       )}
     </div>

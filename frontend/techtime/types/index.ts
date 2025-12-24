@@ -13,6 +13,8 @@ export interface Message {
   timestamp: Date
   toolCalls?: ToolCall[]
   toolResult?: ToolResult
+  diagnostics?: ResponseDiagnostics
+  verification?: VerificationResult
 }
 
 export interface ToolCall {
@@ -27,6 +29,27 @@ export interface ToolResult {
   result: unknown
   error?: string
   duration?: number
+}
+
+// ============================================================================
+// Response Diagnostics Types
+// ============================================================================
+
+export interface ToolUsedInfo {
+  name: string
+  success: boolean
+  durationMs?: number
+}
+
+export interface ResponseDiagnostics {
+  confidenceScore: number
+  thoughts: string[]
+  toolsUsed: ToolUsedInfo[]
+}
+
+export interface VerificationResult {
+  passed: boolean
+  message?: string
 }
 
 // ============================================================================
@@ -195,6 +218,15 @@ export interface ServerMessage {
   response: string
   tool_calls: ToolCall[] | null
   conversation_id: string
+  diagnostics?: {
+    confidence_score: number
+    thoughts: string[]
+    tools_used: { name: string; success: boolean; duration_ms?: number }[]
+  }
+  verification?: {
+    passed: boolean
+    message?: string
+  }
 }
 
 export interface WebSocketError {
@@ -242,6 +274,14 @@ export interface MessageBubbleProps {
   message: Message
   isLatest?: boolean
   showTimestamp?: boolean
+  showDiagnostics?: boolean
+  className?: string
+}
+
+export interface ResponseDiagnosticsPanelProps {
+  diagnostics: ResponseDiagnostics
+  verification?: VerificationResult
+  defaultExpanded?: boolean
   className?: string
 }
 

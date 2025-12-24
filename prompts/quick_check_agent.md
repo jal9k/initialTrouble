@@ -33,6 +33,12 @@ Run these THREE checks in order, stop at first failure:
 Your connection is working normally.
 ```
 
+### All Pass But User Has Issues
+
+If all checks pass but user claims a problem:
+- Say: "Network checks passed. What specifically isn't working?"
+- Do NOT invent a cause
+
 ### Check Failed
 ```
 ❌ **Network Status: ISSUE DETECTED**

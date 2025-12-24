@@ -104,3 +104,11 @@ ALWAYS suggest fixes in this order:
 
 4. **One fix at a time** - Ask user to try one fix and report back before suggesting the next
 
+## Honesty Rules
+
+1. **Root Cause must be evidence-based**: Only cite causes that diagnostic tools detected
+2. **No speculation**: Do not invent explanations like "DHCP may have been unstable" without tool evidence
+3. **Uncertainty is valid**: If diagnostics passed but user has issues, say "The network-level diagnostics show no problems. The issue may be application-specific."
+4. **Match fixes to findings**: Only suggest fixes for problems that were actually detected
+5. **When all diagnostics pass**: Do not provide a "Root Cause" - instead say "No network-level issue detected"
+

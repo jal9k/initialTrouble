@@ -11,7 +11,9 @@ import type {
   ToolCall,
   ToolResult,
   ServerMessage,
-  SessionOutcome
+  SessionOutcome,
+  ResponseDiagnostics,
+  VerificationResult
 } from '@/types'
 
 // ============================================================================
@@ -128,12 +130,37 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         setIsStreaming(false)
         setCurrentToolExecution(null)
 
+        // Convert snake_case diagnostics from server to camelCase
+        let diagnostics: ResponseDiagnostics | undefined
+        if (serverMessage.diagnostics) {
+          diagnostics = {
+            confidenceScore: serverMessage.diagnostics.confidence_score,
+            thoughts: serverMessage.diagnostics.thoughts,
+            toolsUsed: serverMessage.diagnostics.tools_used.map(t => ({
+              name: t.name,
+              success: t.success,
+              durationMs: t.duration_ms
+            }))
+          }
+        }
+
+        // Convert snake_case verification from server to camelCase
+        let verification: VerificationResult | undefined
+        if (serverMessage.verification) {
+          verification = {
+            passed: serverMessage.verification.passed,
+            message: serverMessage.verification.message
+          }
+        }
+
         const assistantMessage: Message = {
           id: generateId('msg'),
           role: 'assistant',
           content: serverMessage.response,
           timestamp: new Date(),
-          toolCalls: serverMessage.tool_calls || undefined
+          toolCalls: serverMessage.tool_calls || undefined,
+          diagnostics,
+          verification
         }
 
         setMessages((prev) => [...prev, assistantMessage])

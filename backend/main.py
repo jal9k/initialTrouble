@@ -30,6 +30,40 @@ class ChatRequest(BaseModel):
     )
 
 
+class ToolUsedInfo(BaseModel):
+    """Information about a tool that was used."""
+    
+    name: str = Field(description="Tool name")
+    success: bool = Field(description="Whether the tool executed successfully")
+    duration_ms: int | None = Field(default=None, description="Execution duration in milliseconds")
+
+
+class ResponseDiagnosticsModel(BaseModel):
+    """Diagnostics information about the response."""
+    
+    confidence_score: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score from 0.0 to 1.0"
+    )
+    thoughts: list[str] = Field(
+        default_factory=list,
+        description="Reasoning observations during processing"
+    )
+    tools_used: list[ToolUsedInfo] = Field(
+        default_factory=list,
+        description="Tools that were executed"
+    )
+
+
+class VerificationResultModel(BaseModel):
+    """Result of verification after action tools."""
+    
+    passed: bool = Field(description="Whether verification passed")
+    message: str | None = Field(default=None, description="Verification result message")
+
+
 class ChatResponseModel(BaseModel):
     """Response from chat endpoint."""
 
@@ -42,6 +76,14 @@ class ChatResponseModel(BaseModel):
     session_id: str | None = Field(
         default=None,
         description="Analytics session ID",
+    )
+    diagnostics: ResponseDiagnosticsModel | None = Field(
+        default=None,
+        description="Response diagnostics including confidence and reasoning"
+    )
+    verification: VerificationResultModel | None = Field(
+        default=None,
+        description="Verification result after action tools"
     )
 
 
@@ -160,6 +202,10 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
     if not state.analytics_collector:
         raise RuntimeError("Analytics not initialized")
 
+    # Initialize diagnostics tracking
+    diagnostics = ResponseDiagnosticsModel()
+    diagnostics.thoughts.append(f"Processing user message: {len(request.message)} chars")
+
     # Get or create conversation
     conv_id = request.conversation_id or str(uuid.uuid4())
     is_new_conversation = conv_id not in state.conversations
@@ -177,6 +223,7 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
         # Start new analytics session
         session = state.analytics_collector.start_session(session_id=conv_id)
         state.session_map[conv_id] = session.session_id
+        diagnostics.thoughts.append("Started new conversation")
 
     # Record user message in analytics
     state.analytics_collector.record_user_message(request.message)
@@ -188,6 +235,7 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
 
     # Get LLM response with tools
     tools = state.tool_registry.get_all_definitions()
+    diagnostics.thoughts.append(f"Available tools: {len(tools)}")
     # #region agent log
     _dbg("main.py:chat:before_llm", "Sending chat with tools", {"tool_count": len(tools), "tools": [t.name for t in tools], "message_count": len(state.conversations[conv_id])}, "H-A")
     # #endregion
@@ -213,6 +261,7 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
     # Handle tool calls
     tool_results = []
     if response.has_tool_calls and response.message.tool_calls:
+        diagnostics.thoughts.append(f"LLM requested {len(response.message.tool_calls)} tool call(s)")
         # #region agent log
         _dbg("main.py:chat:processing_tools", "Processing tool calls", {"count": len(response.message.tool_calls)}, "H-C")
         # #endregion
@@ -220,18 +269,37 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
         state.conversations[conv_id].append(response.message)
         
         for tool_call in response.message.tool_calls:
+            tool_start_time = time.perf_counter()
             # #region agent log
             _dbg("main.py:chat:execute_tool", "Executing tool", {"name": tool_call.name, "arguments": str(tool_call.arguments)}, "H-C")
             # #endregion
             result = await state.tool_registry.execute(tool_call)
+            tool_duration_ms = int((time.perf_counter() - tool_start_time) * 1000)
             # #region agent log
             _dbg("main.py:chat:tool_result", "Tool result", {"name": tool_call.name, "success": result.success}, "H-C")
             # #endregion
+            
+            # Track tool in diagnostics
+            diagnostics.tools_used.append(ToolUsedInfo(
+                name=tool_call.name,
+                success=result.success,
+                duration_ms=tool_duration_ms
+            ))
+            diagnostics.thoughts.append(f"Tool '{tool_call.name}' returned success={result.success}")
+            
+            # Adjust confidence based on tool success
+            if result.success:
+                diagnostics.confidence_score = min(1.0, diagnostics.confidence_score + 0.1)
+            else:
+                diagnostics.confidence_score = max(0.0, diagnostics.confidence_score - 0.2)
+            
             tool_results.append(
                 {
                     "name": tool_call.name,
                     "arguments": tool_call.arguments,
                     "result": result.content,
+                    "success": result.success,
+                    "duration_ms": tool_duration_ms,
                 }
             )
 
@@ -246,20 +314,25 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
             )
 
         # Get final response after tool calls
+        diagnostics.thoughts.append("Getting final response after tool execution")
         response = await state.llm_router.chat(
             messages=state.conversations[conv_id],
             tools=tools,
             temperature=0.3,
         )
+    else:
+        diagnostics.thoughts.append("No tool calls requested")
 
     # Add assistant response to conversation
     state.conversations[conv_id].append(response.message)
+    diagnostics.thoughts.append(f"Response generated: {len(response.content) if response.content else 0} chars")
 
     return ChatResponseModel(
         response=response.content,
         tool_calls=tool_results if tool_results else None,
         conversation_id=conv_id,
         session_id=state.session_map.get(conv_id),
+        diagnostics=diagnostics,
     )
 
 
