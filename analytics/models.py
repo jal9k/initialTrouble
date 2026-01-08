@@ -66,6 +66,9 @@ class Session(BaseModel):
     issue_category: IssueCategory = IssueCategory.UNKNOWN
     osi_layer_resolved: int | None = None  # 1-7 or None
     
+    # Session preview (first user message, truncated)
+    preview: str = ""
+    
     # Conversation metrics
     message_count: int = 0
     user_message_count: int = 0
@@ -103,6 +106,7 @@ class Session(BaseModel):
             "feedback_comment": self.feedback_comment,
             "issue_category": self.issue_category.value,
             "osi_layer_resolved": self.osi_layer_resolved,
+            "preview": self.preview,
             "message_count": self.message_count,
             "user_message_count": self.user_message_count,
             "tool_call_count": self.tool_call_count,
@@ -128,6 +132,7 @@ class Session(BaseModel):
             feedback_comment=data.get("feedback_comment"),
             issue_category=IssueCategory(data.get("issue_category", "unknown")),
             osi_layer_resolved=data.get("osi_layer_resolved"),
+            preview=data.get("preview", ""),
             message_count=data.get("message_count", 0),
             user_message_count=data.get("user_message_count", 0),
             tool_call_count=data.get("tool_call_count", 0),
@@ -272,6 +277,43 @@ class Feedback(BaseModel):
             comment=data.get("comment"),
             timestamp=datetime.fromisoformat(data["timestamp"]),
             source=data.get("source", "cli"),
+        )
+
+
+class ChatMessage(BaseModel):
+    """A single chat message in a session."""
+    
+    message_id: str = Field(default_factory=lambda: str(uuid4()))
+    session_id: str
+    role: str  # "user", "assistant", "system", "tool"
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    tool_call_id: str | None = None  # For tool messages
+    name: str | None = None  # Tool name for tool messages
+    
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for storage."""
+        return {
+            "message_id": self.message_id,
+            "session_id": self.session_id,
+            "role": self.role,
+            "content": self.content,
+            "timestamp": self.timestamp.isoformat(),
+            "tool_call_id": self.tool_call_id,
+            "name": self.name,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ChatMessage":
+        """Create from dictionary."""
+        return cls(
+            message_id=data["message_id"],
+            session_id=data["session_id"],
+            role=data["role"],
+            content=data["content"],
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            tool_call_id=data.get("tool_call_id"),
+            name=data.get("name"),
         )
 
 

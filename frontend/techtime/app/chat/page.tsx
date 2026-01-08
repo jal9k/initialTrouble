@@ -1,29 +1,13 @@
 import { ChatPageClient } from './client'
+import { listSessions, listTools } from '@/lib/api'
 
 export const metadata = {
   title: 'Chat - TechTim(e)',
   description: 'AI-powered L1 desktop support'
 }
 
-// Mock data for now - would be fetched from API
-const mockSessions = [
-  {
-    id: '1',
-    startTime: new Date(Date.now() - 1000 * 60 * 30),
-    outcome: 'resolved' as const,
-    preview: 'WiFi keeps disconnecting...',
-    issueCategory: 'wifi' as const
-  },
-  {
-    id: '2',
-    startTime: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    outcome: 'in_progress' as const,
-    preview: 'Cannot access the internet...',
-    issueCategory: 'connectivity' as const
-  }
-]
-
-const mockTools = [
+// Fallback tools data (used when API is unavailable)
+const fallbackTools = [
   {
     name: 'check_adapter_status',
     displayName: 'Check Adapter Status',
@@ -130,17 +114,29 @@ const mockTools = [
   }
 ]
 
-export default function ChatPage() {
-  // In a real app, you would fetch data here:
-  // const [sessionsResult, toolsResult] = await Promise.all([
-  //   listSessions({ pageSize: 20 }),
-  //   listTools()
-  // ])
+export default async function ChatPage() {
+  // Fetch sessions and tools from API
+  let sessions = []
+  let tools = fallbackTools
+  
+  try {
+    const emptySessionsResponse = { items: [], total: 0, page: 1, pageSize: 20, hasMore: false }
+    const [sessionsResult, toolsResult] = await Promise.all([
+      listSessions({ pageSize: 20 }).catch(() => emptySessionsResponse),
+      listTools().catch(() => fallbackTools)
+    ])
+    
+    sessions = sessionsResult.items || []
+    tools = toolsResult.length > 0 ? toolsResult : fallbackTools
+  } catch {
+    // Use fallback data if API is unavailable
+    console.error('Failed to fetch data from API, using fallback')
+  }
 
   return (
     <ChatPageClient
-      initialSessions={mockSessions}
-      tools={mockTools}
+      initialSessions={sessions}
+      tools={tools}
     />
   )
 }

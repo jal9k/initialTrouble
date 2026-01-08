@@ -288,9 +288,11 @@ class GetIPConfig(BaseDiagnostic):
         return interfaces
 
 
-async def get_ip_config(interface_name: str | None = None) -> DiagnosticResult:
+async def get_ip_config(interface_name: str | None = None, interface: str | None = None) -> DiagnosticResult:
     """Get IP configuration."""
+    # Accept both 'interface' and 'interface_name' for LLM compatibility
+    iface = interface or interface_name
     diag = GetIPConfig()
-    return await diag.run(interface_name=interface_name)
+    return await diag.run(interface_name=iface)
 
 

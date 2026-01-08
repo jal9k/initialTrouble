@@ -75,6 +75,13 @@ class OllamaClient(BaseLLMClient):
         if tools:
             payload["tools"] = [t.to_ollama_schema() for t in tools]
             
+            # #region agent log - H-A: Log full schema for ping_gateway
+            for t in tools:
+                if t.name == "ping_gateway":
+                    schema = t.to_ollama_schema()
+                    _ollama_dbg("ollama:ping_gateway_schema", "ping_gateway schema being sent", {"full_schema": schema, "parameters": [p.name for p in t.parameters]}, "H-A")
+            # #endregion
+            
             # #region debug
             # Workaround: Ollama doesn't fully support tool_choice, so inject instruction
             if tool_choice == "required":
@@ -116,6 +123,11 @@ class OllamaClient(BaseLLMClient):
                 args = func.get("arguments", "{}")
                 if isinstance(args, str):
                     args = json.loads(args)
+
+                # #region agent log - H-B: Log raw tool call from LLM for ping_gateway
+                if func.get("name") == "ping_gateway":
+                    _ollama_dbg("ollama:ping_gateway_call", "ping_gateway called by LLM", {"raw_args": args, "arg_keys": list(args.keys()) if isinstance(args, dict) else "not_dict"}, "H-B")
+                # #endregion
 
                 tool_calls.append(
                     ToolCall(

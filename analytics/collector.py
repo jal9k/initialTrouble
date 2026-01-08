@@ -326,7 +326,19 @@ class AnalyticsCollector:
         self.storage.save_event(event)
 
         self._current_session.user_message_count += 1
+        
+        # Set preview from first user message (if not already set)
+        if not self._current_session.preview:
+            preview = message[:50] + "..." if len(message) > 50 else message
+            self._current_session.preview = preview
+        
         self.storage.save_session(self._current_session)
+    
+    def set_session_preview(self, preview: str) -> None:
+        """Set the session preview text."""
+        if self._current_session:
+            self._current_session.preview = preview[:50] + "..." if len(preview) > 50 else preview
+            self.storage.save_session(self._current_session)
 
     # Feedback handling
 

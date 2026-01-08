@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Generator
 
 from .models import (
+    ChatMessage,
     Event,
     Feedback,
     IssueCategory,
@@ -47,6 +48,7 @@ class AnalyticsStorage:
                     feedback_comment TEXT,
                     issue_category TEXT DEFAULT 'unknown',
                     osi_layer_resolved INTEGER,
+                    preview TEXT DEFAULT '',
                     message_count INTEGER DEFAULT 0,
                     user_message_count INTEGER DEFAULT 0,
                     tool_call_count INTEGER DEFAULT 0,
@@ -58,6 +60,12 @@ class AnalyticsStorage:
                     total_tool_time_ms INTEGER DEFAULT 0
                 )
             """)
+            
+            # Migration: Add preview column if it doesn't exist (for existing databases)
+            cursor.execute("PRAGMA table_info(sessions)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "preview" not in columns:
+                cursor.execute("ALTER TABLE sessions ADD COLUMN preview TEXT DEFAULT ''")
 
             # Events table
             cursor.execute("""
@@ -117,6 +125,20 @@ class AnalyticsStorage:
                 )
             """)
 
+            # Messages table (for chat history persistence)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    message_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    tool_call_id TEXT,
+                    name TEXT,
+                    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                )
+            """)
+
             # Create indexes for common queries
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_sessions_started_at 
@@ -137,6 +159,10 @@ class AnalyticsStorage:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_tool_events_tool_name 
                 ON tool_events(tool_name)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_messages_session_id 
+                ON messages(session_id)
             """)
 
             conn.commit()
@@ -161,10 +187,10 @@ class AnalyticsStorage:
                 INSERT OR REPLACE INTO sessions (
                     session_id, started_at, ended_at, total_prompt_tokens,
                     total_completion_tokens, outcome, feedback_score, feedback_comment,
-                    issue_category, osi_layer_resolved, message_count, user_message_count,
+                    issue_category, osi_layer_resolved, preview, message_count, user_message_count,
                     tool_call_count, llm_backend, model_name, had_fallback,
                     estimated_cost_usd, total_llm_time_ms, total_tool_time_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session.session_id,
                 session.started_at.isoformat(),
@@ -176,6 +202,7 @@ class AnalyticsStorage:
                 session.feedback_comment,
                 session.issue_category.value,
                 session.osi_layer_resolved,
+                session.preview,
                 session.message_count,
                 session.user_message_count,
                 session.tool_call_count,
@@ -197,6 +224,43 @@ class AnalyticsStorage:
             if row is None:
                 return None
             return self._row_to_session(row)
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session and all related data."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # Delete related data first (foreign key constraints)
+            cursor.execute("DELETE FROM events WHERE session_id = ?", (session_id,))
+            cursor.execute("DELETE FROM tool_events WHERE session_id = ?", (session_id,))
+            cursor.execute("DELETE FROM feedback WHERE session_id = ?", (session_id,))
+            cursor.execute("DELETE FROM resolution_paths WHERE session_id = ?", (session_id,))
+            cursor.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+            # Delete the session
+            cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def update_session_preview(self, session_id: str, preview: str) -> bool:
+        """Update the preview/title of a session."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE sessions SET preview = ? WHERE session_id = ?",
+                (preview, session_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def update_session_outcome(self, session_id: str, outcome: SessionOutcome) -> bool:
+        """Update the outcome of a session (e.g., to 'abandoned' for archive)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE sessions SET outcome = ? WHERE session_id = ?",
+                (outcome.value, session_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
 
     def get_sessions(
         self,
@@ -245,6 +309,7 @@ class AnalyticsStorage:
             feedback_comment=row["feedback_comment"],
             issue_category=IssueCategory(row["issue_category"]),
             osi_layer_resolved=row["osi_layer_resolved"],
+            preview=row["preview"] or "",
             message_count=row["message_count"],
             user_message_count=row["user_message_count"],
             tool_call_count=row["tool_call_count"],
@@ -395,6 +460,49 @@ class AnalyticsStorage:
                 timestamp=datetime.fromisoformat(row["timestamp"]),
                 source=row["source"],
             )
+
+    # Message operations (chat history persistence)
+
+    def save_message(self, message: ChatMessage) -> None:
+        """Save a chat message."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO messages (
+                    message_id, session_id, role, content, timestamp,
+                    tool_call_id, name
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                message.message_id,
+                message.session_id,
+                message.role,
+                message.content,
+                message.timestamp.isoformat(),
+                message.tool_call_id,
+                message.name,
+            ))
+            conn.commit()
+
+    def get_messages(self, session_id: str) -> list[ChatMessage]:
+        """Get all messages for a session, ordered by timestamp."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp",
+                (session_id,)
+            )
+            return [
+                ChatMessage(
+                    message_id=row["message_id"],
+                    session_id=row["session_id"],
+                    role=row["role"],
+                    content=row["content"],
+                    timestamp=datetime.fromisoformat(row["timestamp"]),
+                    tool_call_id=row["tool_call_id"],
+                    name=row["name"],
+                )
+                for row in cursor.fetchall()
+            ]
 
     # Resolution path operations
 

@@ -4,9 +4,17 @@ See docs/functions/check_adapter_status.md for full specification.
 """
 
 from typing import Any
+import json
+import time
 
 from .base import BaseDiagnostic, DiagnosticResult
 from .platform import Platform
+
+# #region agent log
+def _dbg_adapter(loc: str, msg: str, data: dict, hyp: str = "H-ADAPTER"):
+    with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as f:
+        f.write(json.dumps({"location": loc, "message": msg, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session", "hypothesisId": hyp}) + "\n")
+# #endregion
 
 
 class CheckAdapterStatus(BaseDiagnostic):
@@ -53,31 +61,69 @@ class CheckAdapterStatus(BaseDiagnostic):
         if interface_name:
             adapters = [a for a in adapters if a["name"] == interface_name]
 
-        # Calculate summary stats
-        active_count = sum(1 for a in adapters if a["status"] == "up")
-        connected_count = sum(1 for a in adapters if a["is_connected"])
+        # Calculate summary stats (EXCLUDE loopback from counts - it's always connected)
+        real_adapters = [a for a in adapters if a["type"] != "loopback"]
+        active_count = sum(1 for a in real_adapters if a["status"] == "up")
+        connected_count = sum(1 for a in real_adapters if a["is_connected"])
+
+        # #region agent log
+        # H1/H3: Log all adapters to see what data the LLM will receive
+        wifi_adapters = [a for a in adapters if a["name"].startswith("en")]
+        _dbg_adapter("adapter.py:_run_macos:parsed", "Parsed adapter data", {
+            "all_adapters": adapters,
+            "wifi_adapters": wifi_adapters,
+            "active_count": active_count,
+            "connected_count": connected_count,
+        }, "H1")
+        # H3: Specifically log WiFi adapter status
+        for wa in wifi_adapters:
+            _dbg_adapter("adapter.py:_run_macos:wifi_status", f"WiFi adapter {wa['name']} status", {
+                "name": wa["name"],
+                "status": wa["status"],  # up/down (enabled/disabled)
+                "is_connected": wa["is_connected"],  # connected to network?
+                "has_ip": wa["has_ip"],
+            }, "H3")
+        # #endregion
 
         # Find primary interface (first non-loopback with IP that's connected)
         primary = next(
-            (a["name"] for a in adapters if a["has_ip"] and a["is_connected"] and a["type"] != "loopback"),
+            (a["name"] for a in real_adapters if a["has_ip"] and a["is_connected"]),
             None,
         )
+        
+        # Check if any real adapter has network connectivity
+        has_network_connection = connected_count > 0
 
         # Generate suggestions if needed
         suggestions = []
         if active_count == 0:
             suggestions.append("All network adapters are disabled")
+            suggestions.append("ACTION: Call enable_wifi to enable the WiFi adapter")
             suggestions.append("Enable a network adapter in System Preferences > Network")
         elif connected_count == 0:
-            suggestions.append("No adapters are connected to a network")
-            suggestions.append("Check if WiFi is connected to an access point")
-            suggestions.append("Check if Ethernet cable is plugged in")
+            suggestions.append("CRITICAL: No network adapters are connected to any network")
+            suggestions.append("ACTION: Call enable_wifi to enable WiFi and attempt connection")
+            suggestions.append("WiFi may be turned off or not connected to a network")
+            suggestions.append("If WiFi is already on, user needs to manually select a network")
+
+        # #region agent log
+        # H5: Log the summary fields that should tell LLM to stop
+        _dbg_adapter("adapter.py:_run_macos:summary", "Summary stats for LLM", {
+            "active_count": active_count,
+            "connected_count": connected_count,
+            "has_network_connection": has_network_connection,
+            "primary_interface": primary,
+            "suggestions_count": len(suggestions),
+            "suggestions": suggestions,
+        }, "H5")
+        # #endregion
 
         return self._success(
             data={
                 "adapters": adapters,
                 "active_count": active_count,
                 "connected_count": connected_count,
+                "has_network_connection": has_network_connection,  # FALSE = STOP diagnostics!
                 "primary_interface": primary,
             },
             raw_output=result.stdout,
@@ -224,9 +270,11 @@ class CheckAdapterStatus(BaseDiagnostic):
 
 
 # Module-level function for easy importing
-async def check_adapter_status(interface_name: str | None = None) -> DiagnosticResult:
+async def check_adapter_status(interface_name: str | None = None, interface: str | None = None) -> DiagnosticResult:
     """Check network adapter status."""
+    # Accept both 'interface' and 'interface_name' for LLM compatibility
+    iface = interface or interface_name
     diag = CheckAdapterStatus()
-    return await diag.run(interface_name=interface_name)
+    return await diag.run(interface_name=iface)
 
 

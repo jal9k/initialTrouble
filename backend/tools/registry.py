@@ -14,6 +14,56 @@ if TYPE_CHECKING:
 logger = logging.getLogger("techtime.tools.registry")
 F = TypeVar("F", bound=Callable[..., Any])
 
+# #region agent log - H-FIX: Argument normalization for small model hallucinations
+# Maps tool names to their parameter aliases. Small models often hallucinate
+# parameter names (e.g., "gateway_ip" instead of "gateway"). This mapping
+# normalizes these aliases to the actual parameter names.
+PARAM_ALIASES: dict[str, dict[str, str]] = {
+    "ping_gateway": {
+        "gateway_ip": "gateway",
+        "target": "gateway",
+        "ip": "gateway",
+        "host": "gateway",
+        "address": "gateway",
+    },
+    "get_ip_config": {
+        "interface": "interface_name",
+        "iface": "interface_name",
+        "adapter": "interface_name",
+    },
+    "check_adapter_status": {
+        "interface": "interface_name",
+        "iface": "interface_name",
+        "adapter": "interface_name",
+    },
+}
+
+
+def normalize_arguments(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """
+    Normalize tool arguments by mapping aliases to actual parameter names.
+    
+    Small language models often hallucinate parameter names based on training data
+    instead of strictly following the provided schema. This function maps common
+    aliases to the actual expected parameter names.
+    """
+    if tool_name not in PARAM_ALIASES:
+        return arguments
+    
+    aliases = PARAM_ALIASES[tool_name]
+    normalized = {}
+    
+    for key, value in arguments.items():
+        if key in aliases:
+            actual_key = aliases[key]
+            logger.info(f"Normalized argument '{key}' to '{actual_key}' for tool {tool_name}")
+            normalized[actual_key] = value
+        else:
+            normalized[key] = value
+    
+    return normalized
+# #endregion
+
 
 class ToolRegistry:
     """Registry for managing diagnostic tools."""
@@ -94,6 +144,26 @@ class ToolRegistry:
             "arguments": tool_call.arguments,
             "tool_call_id": tool_call.id,
         })
+        # #endregion
+        
+        # #region agent log - H-C: Log expected vs received params for ping_gateway
+        if tool_call.name == "ping_gateway":
+            import json as _json
+            import time as _time
+            with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as _f:
+                definition = self.get_definition("ping_gateway")
+                expected_params = [p.name for p in definition.parameters] if definition else []
+                _f.write(_json.dumps({"location": "registry:ping_gateway_exec", "message": "ping_gateway execution attempt", "data": {"received_args": tool_call.arguments, "received_keys": list(tool_call.arguments.keys()), "expected_params": expected_params, "match": all(k in expected_params or k == "count" for k in tool_call.arguments.keys())}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-C"}) + "\n")
+        # #endregion
+        
+        # #region agent log - H-FIX: Normalize arguments before execution
+        original_args = dict(tool_call.arguments)
+        tool_call.arguments = normalize_arguments(tool_call.name, tool_call.arguments)
+        if original_args != tool_call.arguments:
+            import json as _json
+            import time as _time
+            with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as _f:
+                _f.write(_json.dumps({"location": "registry:normalize", "message": "Arguments normalized", "data": {"tool": tool_call.name, "original": original_args, "normalized": tool_call.arguments}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-FIX"}) + "\n")
         # #endregion
         
         tool = self.get_tool(tool_call.name)

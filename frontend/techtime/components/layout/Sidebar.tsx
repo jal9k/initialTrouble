@@ -21,8 +21,19 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  XCircle
+  XCircle,
+  MoreHorizontal,
+  Trash2,
+  Edit3,
+  Archive
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import type { SessionOutcome, SidebarProps } from '@/types'
 
 const outcomeBadgeStyles: Record<SessionOutcome, string> = {
@@ -42,6 +53,9 @@ const outcomeIcons: Record<SessionOutcome, typeof CheckCircle> = {
 interface ExtendedSidebarProps extends SidebarProps {
   isCollapsed?: boolean
   onToggleCollapse?: () => void
+  onDeleteSession?: (sessionId: string) => void
+  onRenameSession?: (sessionId: string) => void
+  onArchiveSession?: (sessionId: string) => void
 }
 
 export function Sidebar({
@@ -52,6 +66,9 @@ export function Sidebar({
   isLoading = false,
   isCollapsed = false,
   onToggleCollapse,
+  onDeleteSession,
+  onRenameSession,
+  onArchiveSession,
   className
 }: ExtendedSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -226,17 +243,17 @@ export function Sidebar({
               }
 
               return (
-                <button
+                <div
                   key={session.id}
-                  onClick={() => onSessionSelect(session.id)}
                   className={cn(
                     'w-full text-left p-3 rounded-xl transition-all duration-200 mb-1',
                     'hover:bg-muted/80 hover:shadow-sm',
-                    'border-2 group',
+                    'border-2 group cursor-pointer',
                     isActive
                       ? 'bg-primary/10 border-primary/50 shadow-sm'
                       : 'border-transparent hover:border-muted-foreground/10'
                   )}
+                  onClick={() => onSessionSelect(session.id)}
                 >
                   <div className="flex items-start gap-3">
                     <div className={cn(
@@ -255,9 +272,62 @@ export function Sidebar({
                       )} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                        {truncate(session.preview, 35)}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                          {truncate(session.preview, 28)}
+                        </p>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:bg-muted"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            {onRenameSession && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onRenameSession(session.id)
+                                }}
+                              >
+                                <Edit3 className="h-4 w-4 mr-2" />
+                                Rename
+                              </DropdownMenuItem>
+                            )}
+                            {onArchiveSession && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onArchiveSession(session.id)
+                                }}
+                              >
+                                <Archive className="h-4 w-4 mr-2" />
+                                Archive
+                              </DropdownMenuItem>
+                            )}
+                            {(onRenameSession || onArchiveSession) && onDeleteSession && (
+                              <DropdownMenuSeparator />
+                            )}
+                            {onDeleteSession && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDeleteSession(session.id)
+                                }}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-muted-foreground">
                           {formatDate(session.startTime, 'relative')}
@@ -276,7 +346,7 @@ export function Sidebar({
                       </div>
                     </div>
                   </div>
-                </button>
+                </div>
               )
             })
           )}

@@ -22,7 +22,13 @@ from analytics.models import SessionOutcome, IssueCategory
 
 # #region debug
 from datetime import datetime
+import json as _json
+import time as _time
 from .logging_config import debug_log, ResponseDiagnostics
+
+def _dbg_cli(loc: str, msg: str, data: dict, hyp: str = "H-CLI"):
+    with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as f:
+        f.write(_json.dumps({"location": loc, "message": msg, "data": data, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": hyp}) + "\n")
 # #endregion
 
 # Initialize logging
@@ -120,6 +126,19 @@ async def execute_tool_loop(
             tool_choice=tool_choice,
         )
         
+        # #region agent log
+        # H4: Log the LLM response to see what it's reasoning/deciding
+        _dbg_cli("cli.py:execute_tool_loop:llm_response", f"LLM response iteration {iteration + 1}", {
+            "iteration": iteration + 1,
+            "tool_choice": tool_choice,
+            "has_tool_calls": response.has_tool_calls,
+            "tool_call_count": len(response.message.tool_calls) if response.message.tool_calls else 0,
+            "tool_names": [tc.name for tc in response.message.tool_calls] if response.message.tool_calls else [],
+            "content_preview": (response.content[:500] if response.content else "(no content)"),
+            "finish_reason": response.finish_reason,
+        }, "H4")
+        # #endregion
+        
         # If no tool calls, we're done
         if not response.has_tool_calls or not response.message.tool_calls:
             # #region debug
@@ -168,6 +187,13 @@ async def execute_tool_loop(
                 "success": result.success,
                 "content_length": len(result.content),
             })
+            # H2: Log FULL tool result to check if truncation is the issue
+            _dbg_cli("cli.py:execute_tool_loop:tool_result", f"FULL tool result for {tool_call.name}", {
+                "tool_name": tool_call.name,
+                "success": result.success,
+                "content_length": len(result.content),
+                "full_content": result.content,  # Full content, not truncated
+            }, "H2")
             if diagnostics:
                 diagnostics.add_tool_result(tool_call.name, {
                     "success": result.success,
@@ -493,6 +519,16 @@ async def run_chat_loop():
             # =================================================================
             # MULTI-TURN TOOL EXECUTION LOOP
             # =================================================================
+            # #region agent log
+            # H2/H4: Log the conversation state before tool loop
+            _dbg_cli("cli.py:run_chat_loop:before_tool_loop", "Conversation state before tool loop", {
+                "message_count": len(messages),
+                "system_prompt_preview": messages[0].content[:200] if messages and messages[0].role == "system" else "(no system)",
+                "user_message": messages[-1].content if messages and messages[-1].role == "user" else "(no user)",
+                "tool_count": len(tools),
+                "tool_names": [t.name for t in tools],
+            }, "H4")
+            # #endregion
             final_message, action_tool_called = await execute_tool_loop(
                 llm_router=llm_router,
                 tool_registry=tool_registry,
@@ -503,6 +539,15 @@ async def run_chat_loop():
             
             # Add final response to messages
             messages.append(final_message)
+            
+            # #region agent log
+            # H4: Log the FINAL response content to see what LLM concluded
+            _dbg_cli("cli.py:run_chat_loop:final_response", "LLM final response to user", {
+                "final_content": final_message.content if final_message.content else "(empty)",
+                "content_length": len(final_message.content) if final_message.content else 0,
+                "action_tool_called": action_tool_called,
+            }, "H4")
+            # #endregion
             
             # Display initial response with timestamp
             # #region debug

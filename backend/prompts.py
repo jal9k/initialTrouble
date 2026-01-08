@@ -8,11 +8,18 @@ from functools import lru_cache
 class AgentType(Enum):
     """Available agent types with specialized prompts."""
     
+    # Original agent types
     DEFAULT = "default"      # General-purpose diagnostician
     TRIAGE = "triage"        # Quick issue categorization
     DIAGNOSTIC = "diagnostic"  # Systematic OSI-layer troubleshooting
     REMEDIATION = "remediation"  # Fix suggestions
     QUICK_CHECK = "quick_check"  # Fast health check
+    
+    # Multi-OS agent types
+    MANAGER = "manager"      # Triage coordinator for OS routing
+    MACOS = "macos"          # macOS specialist
+    WINDOWS = "windows"      # Windows specialist
+    LINUX = "linux"          # Linux specialist
 
 
 # Prompt directory relative to this file
