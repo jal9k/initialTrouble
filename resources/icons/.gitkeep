@@ -1,0 +1,16 @@
+# Icon Resources
+
+This directory should contain application icons:
+
+- icon.icns  - macOS icon (1024x1024, can include multiple sizes)
+- icon.ico   - Windows icon (256x256, can include multiple sizes)
+- icon.png   - Linux/general use (512x512)
+
+For development, placeholder icons will be used if these files are not present.
+You can create icons using online tools or image editing software.
+
+Recommended specifications:
+- macOS (.icns): 1024x1024 base size, sips or iconutil to create
+- Windows (.ico): 256x256 base size, can include 16, 32, 48, 64, 128, 256
+- PNG: 512x512 or 1024x1024 for high-DPI displays
+

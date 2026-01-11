@@ -139,8 +139,8 @@ async def lifespan(app: FastAPI):
     # Startup
     settings = get_settings()
     
-    # Initialize analytics
-    db_path = Path("data/analytics.db")
+    # Initialize analytics with settings-based path
+    db_path = settings.database_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
     state.analytics_storage = AnalyticsStorage(db_path)
     state.analytics_collector = AnalyticsCollector(storage=state.analytics_storage)
@@ -358,11 +358,6 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
     import uuid
     import json
     import time
-    # #region agent log
-    def _dbg(loc: str, msg: str, data: dict, hyp: str = "BACKEND"):
-        with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as f:
-            f.write(json.dumps({"location": loc, "message": msg, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session", "hypothesisId": hyp}) + "\n")
-    # #endregion
 
     if not state.llm_router or not state.tool_registry:
         raise RuntimeError("Application not initialized")
@@ -414,14 +409,6 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
     tools = state.tool_registry.get_all_definitions()
     diagnostics.thoughts.append(f"Available tools: {len(tools)}")
     
-    # #region agent log - H-I: Log available tools for this request
-    _dbg("main.py:chat:tools_available", "Tools sent to LLM", {
-        "tool_count": len(tools),
-        "tool_names": [t.name for t in tools],
-        "user_message": request.message[:150]
-    }, "H-I")
-    # #endregion
-    
     # Multi-turn tool execution loop (like CLI's execute_tool_loop)
     MAX_TOOL_ITERATIONS = 7
     tool_results = []
@@ -429,13 +416,6 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
     for iteration in range(MAX_TOOL_ITERATIONS):
         # Force tool call on first iteration, allow auto on subsequent
         tool_choice = "required" if iteration == 0 else "auto"
-        
-        # #region agent log
-        _dbg("main.py:chat:tool_loop", f"Tool loop iteration {iteration + 1}", {
-            "tool_choice": tool_choice,
-            "message_count": len(state.conversations[conv_id])
-        }, "H-LOOP")
-        # #endregion
         diagnostics.thoughts.append(f"Tool loop iteration {iteration + 1}, tool_choice={tool_choice}")
         
         response = await state.llm_router.chat(
@@ -453,14 +433,6 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
                 had_fallback=state.llm_router.had_fallback,
             )
         
-        # #region agent log
-        _dbg("main.py:chat:llm_response", f"LLM response iteration {iteration + 1}", {
-            "has_tool_calls": response.has_tool_calls,
-            "tool_count": len(response.message.tool_calls) if response.message.tool_calls else 0,
-            "content_len": len(response.content) if response.content else 0
-        }, "H-LOOP")
-        # #endregion
-        
         # If no tool calls, we're done with the loop
         if not response.has_tool_calls or not response.message.tool_calls:
             diagnostics.thoughts.append(f"No tool calls in iteration {iteration + 1}, ending loop")
@@ -473,19 +445,8 @@ async def chat(request: ChatRequest) -> ChatResponseModel:
         # Execute each tool call
         for tool_call in response.message.tool_calls:
             tool_start_time = time.perf_counter()
-            # #region agent log - H-F: Log tool selection details
-            _dbg("main.py:chat:execute_tool", "Executing tool", {
-                "name": tool_call.name, 
-                "arguments": str(tool_call.arguments),
-                "user_message": request.message[:100],  # First 100 chars of user msg
-                "iteration": iteration
-            }, "H-F")
-            # #endregion
             result = await state.tool_registry.execute(tool_call)
             tool_duration_ms = int((time.perf_counter() - tool_start_time) * 1000)
-            # #region agent log
-            _dbg("main.py:chat:tool_result", "Tool result", {"name": tool_call.name, "success": result.success}, "H-C")
-            # #endregion
             
             # Track tool in diagnostics
             diagnostics.tools_used.append(ToolUsedInfo(
@@ -569,23 +530,12 @@ async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time chat."""
     import json
     import time
-    # #region agent log
-    def _ws_dbg(loc: str, msg: str, data: dict, hyp: str = "WS"):
-        with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as f:
-            f.write(json.dumps({"location": loc, "message": msg, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session", "hypothesisId": hyp}) + "\n")
-    # #endregion
     await websocket.accept()
-    # #region agent log
-    _ws_dbg("main.py:ws:accept", "WebSocket accepted", {}, "H-WS")
-    # #endregion
 
     try:
         while True:
             data = await websocket.receive_json()
             message = data.get("message", "")
-            # #region agent log
-            _ws_dbg("main.py:ws:received", "Received message", {"message_len": len(message), "has_conv_id": "conversation_id" in data}, "H-WS")
-            # #endregion
 
             # Create request and get response
             request = ChatRequest(
@@ -593,9 +543,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 conversation_id=data.get("conversation_id"),
             )
             response = await chat(request)
-            # #region agent log
-            _ws_dbg("main.py:ws:response", "Chat response ready", {"has_tool_calls": response.tool_calls is not None, "response_len": len(response.response) if response.response else 0}, "H-WS")
-            # #endregion
 
             await websocket.send_json(response.model_dump())
 

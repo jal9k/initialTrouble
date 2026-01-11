@@ -27,6 +27,7 @@ export interface ToolResult {
   toolCallId: string
   name: string
   result: unknown
+  success?: boolean
   error?: string
   duration?: number
 }
@@ -257,6 +258,10 @@ export interface HealthResponse {
   status: 'healthy' | 'degraded' | 'unhealthy'
   version: string
   uptime: number
+  ollama?: {
+    available: boolean
+    model?: string
+  }
 }
 
 // ============================================================================

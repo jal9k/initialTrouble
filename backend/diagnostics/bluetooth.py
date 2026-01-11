@@ -53,22 +53,9 @@ class ToggleBluetooth(BaseDiagnostic):
         self, action: str, interface: str | None
     ) -> DiagnosticResult:
         """Control Bluetooth on macOS using blueutil."""
-        # #region agent log - H-D, H-E: Log entry and parameters
-        import json as _json
-        import time as _time
-        _log_path = "/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log"
-        with open(_log_path, "a") as _f:
-            _f.write(_json.dumps({"location": "bluetooth.py:_run_macos:entry", "message": "Entering _run_macos", "data": {"action": action, "interface": interface, "platform": str(self.platform)}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-D,H-E"}) + "\n")
-        # #endregion
-        
         # Check if blueutil is available
         check_cmd = "which blueutil"
         check_result = await self.executor.run(check_cmd, shell=True)
-        
-        # #region agent log - H-A: Log blueutil check result
-        with open(_log_path, "a") as _f:
-            _f.write(_json.dumps({"location": "bluetooth.py:_run_macos:blueutil_check", "message": "blueutil check result", "data": {"success": check_result.success, "stdout": check_result.stdout, "stderr": check_result.stderr, "return_code": check_result.return_code}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-A"}) + "\n")
-        # #endregion
 
         if not check_result.success or not check_result.stdout.strip():
             # Try system_profiler as fallback for status
@@ -86,11 +73,6 @@ class ToggleBluetooth(BaseDiagnostic):
             # Get current Bluetooth power state
             result = await self.executor.run("blueutil --power", shell=True)
             
-            # #region agent log - H-B, H-C: Log power command result
-            with open(_log_path, "a") as _f:
-                _f.write(_json.dumps({"location": "bluetooth.py:_run_macos:status", "message": "blueutil --power result", "data": {"success": result.success, "stdout": repr(result.stdout), "stdout_stripped": repr(result.stdout.strip()), "stderr": result.stderr, "return_code": result.return_code}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-B,H-C"}) + "\n")
-            # #endregion
-            
             if not result.success:
                 return self._failure(
                     error="Failed to get Bluetooth status",
@@ -99,11 +81,6 @@ class ToggleBluetooth(BaseDiagnostic):
 
             power_state = result.stdout.strip()
             is_on = power_state == "1"
-            
-            # #region agent log - H-B: Log parsing result
-            with open(_log_path, "a") as _f:
-                _f.write(_json.dumps({"location": "bluetooth.py:_run_macos:status_parsed", "message": "Parsed power state", "data": {"power_state": repr(power_state), "is_on": is_on, "comparison_1": power_state == "1", "comparison_0": power_state == "0"}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-B"}) + "\n")
-            # #endregion
 
             return self._success(
                 data={
@@ -118,12 +95,6 @@ class ToggleBluetooth(BaseDiagnostic):
         elif action == "on":
             # Check current state first
             current = await self.executor.run("blueutil --power", shell=True)
-            
-            # #region agent log - H-B, H-C: Log current state for 'on' action
-            with open(_log_path, "a") as _f:
-                _f.write(_json.dumps({"location": "bluetooth.py:_run_macos:on_check", "message": "Checking current state for 'on' action", "data": {"success": current.success, "stdout": repr(current.stdout), "stdout_stripped": repr(current.stdout.strip())}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-B,H-C"}) + "\n")
-            # #endregion
-            
             was_on = current.stdout.strip() == "1"
 
             if was_on:
@@ -205,21 +176,8 @@ class ToggleBluetooth(BaseDiagnostic):
 
     async def _macos_status_fallback(self) -> DiagnosticResult:
         """Get Bluetooth status on macOS without blueutil using system_profiler."""
-        # #region agent log - H-A: Log fallback being triggered
-        import json as _json
-        import time as _time
-        _log_path = "/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log"
-        with open(_log_path, "a") as _f:
-            _f.write(_json.dumps({"location": "bluetooth.py:_macos_status_fallback:entry", "message": "Fallback triggered - blueutil not found", "data": {}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-A"}) + "\n")
-        # #endregion
-        
         cmd = "system_profiler SPBluetoothDataType 2>/dev/null | grep -i 'State:'"
         result = await self.executor.run(cmd, shell=True)
-        
-        # #region agent log - H-A: Log system_profiler result
-        with open(_log_path, "a") as _f:
-            _f.write(_json.dumps({"location": "bluetooth.py:_macos_status_fallback:result", "message": "system_profiler result", "data": {"success": result.success, "stdout": result.stdout, "stderr": result.stderr}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-A"}) + "\n")
-        # #endregion
 
         if result.success and result.stdout:
             is_on = "on" in result.stdout.lower()

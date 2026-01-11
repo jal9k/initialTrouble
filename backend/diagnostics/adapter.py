@@ -277,4 +277,3 @@ async def check_adapter_status(interface_name: str | None = None, interface: str
     diag = CheckAdapterStatus()
     return await diag.run(interface_name=iface)
 
-

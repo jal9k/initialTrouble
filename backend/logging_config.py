@@ -43,7 +43,13 @@ def setup_logging(
 
     # File handler
     if log_to_file:
-        log_dir = log_dir or Path("data/logs")
+        # Use provided log_dir, or get from settings, or fallback
+        if log_dir is None:
+            try:
+                from .config import get_settings
+                log_dir = get_settings().log_path
+            except Exception:
+                log_dir = Path("data/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # Daily log file

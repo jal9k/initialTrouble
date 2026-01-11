@@ -1,13 +1,13 @@
 import { ChatPageClient } from './client'
-import { listSessions, listTools } from '@/lib/api'
+import type { DiagnosticTool } from '@/types'
 
 export const metadata = {
   title: 'Chat - TechTim(e)',
   description: 'AI-powered L1 desktop support'
 }
 
-// Fallback tools data (used when API is unavailable)
-const fallbackTools = [
+// Fallback tools data (used when API is unavailable or in static export mode)
+const fallbackTools: DiagnosticTool[] = [
   {
     name: 'check_adapter_status',
     displayName: 'Check Adapter Status',
@@ -114,29 +114,20 @@ const fallbackTools = [
   }
 ]
 
-export default async function ChatPage() {
-  // Fetch sessions and tools from API
-  let sessions = []
-  let tools = fallbackTools
-  
-  try {
-    const emptySessionsResponse = { items: [], total: 0, page: 1, pageSize: 20, hasMore: false }
-    const [sessionsResult, toolsResult] = await Promise.all([
-      listSessions({ pageSize: 20 }).catch(() => emptySessionsResponse),
-      listTools().catch(() => fallbackTools)
-    ])
-    
-    sessions = sessionsResult.items || []
-    tools = toolsResult.length > 0 ? toolsResult : fallbackTools
-  } catch {
-    // Use fallback data if API is unavailable
-    console.error('Failed to fetch data from API, using fallback')
-  }
-
+/**
+ * Chat page - statically exportable.
+ *
+ * For static export compatibility, we don't fetch data at build time.
+ * The client component fetches sessions dynamically on mount.
+ * Tools are provided as static fallback data.
+ */
+export default function ChatPage() {
+  // For static export, we pass empty sessions and fallback tools
+  // The client component will fetch sessions dynamically after mount
   return (
     <ChatPageClient
-      initialSessions={sessions}
-      tools={tools}
+      initialSessions={[]}
+      tools={fallbackTools}
     />
   )
 }

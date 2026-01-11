@@ -35,6 +35,7 @@ dependencies = [
     "typer>=0.9.0",
     "ollama>=0.1.6",
     "openai>=1.10.0",
+    "pywebview>=5.0",
 ]
 
 [project.optional-dependencies]
@@ -53,12 +54,22 @@ Documentation = "https://github.com/example/techtime#readme"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["backend*"]
+include = ["backend*", "desktop*", "analytics*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["backend/tests"]
+testpaths = ["backend/tests", "tests"]
 pythonpath = ["."]
+addopts = "-v --tb=short --strict-markers -ra"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "requires_ollama: marks tests that need a running Ollama instance",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100

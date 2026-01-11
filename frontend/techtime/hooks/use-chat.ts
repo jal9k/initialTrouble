@@ -5,6 +5,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useWebSocket } from './use-websocket'
 import { getSessionMessages } from '@/lib/api'
+import { isDesktopMode, unifiedApi } from '@/lib/pywebview-api'
 import { generateId } from '@/lib/utils'
 import type {
   Message,
@@ -91,8 +92,12 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   const [error, setError] = useState<Error | null>(null)
   const [currentToolExecution, setCurrentToolExecution] = useState<ToolCall | null>(null)
 
+  // Track if we're in desktop mode (PyWebView)
+  const [isDesktop, setIsDesktop] = useState(false)
+
   // Refs
   const pendingMessageRef = useRef<string | null>(null)
+  const currentToolExecutionRef = useRef<ToolCall | null>(null)
   const callbacksRef = useRef({
     onSessionStart,
     onSessionEnd,
@@ -111,6 +116,11 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
       onToolComplete
     }
   }, [onSessionStart, onSessionEnd, onMessage, onToolStart, onToolComplete])
+
+  // Check desktop mode on mount
+  useEffect(() => {
+    setIsDesktop(isDesktopMode())
+  }, [])
 
   // Handle incoming WebSocket messages
   const handleWebSocketMessage = useCallback(
@@ -199,9 +209,10 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     [conversationId]
   )
 
-  // WebSocket connection
+  // WebSocket connection (disabled in desktop mode - uses PyWebView API instead)
   const { send } = useWebSocket({
-    onMessage: handleWebSocketMessage
+    onMessage: handleWebSocketMessage,
+    enabled: !isDesktop
   })
 
   // Load from localStorage on mount (only for new conversations without initialConversationId)
@@ -269,13 +280,71 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
       setMessages((prev) => [...prev, userMessage])
       pendingMessageRef.current = content.trim()
 
-      // Send via WebSocket
-      send({
-        message: content.trim(),
-        conversation_id: conversationId || undefined
-      })
+      // Use different communication paths for desktop vs HTTP mode
+      if (isDesktop) {
+        // Desktop mode: use direct PyWebView API call
+        try {
+          const sessionId = conversationId || (await unifiedApi.createSession())
+
+          if (!conversationId) {
+            setConversationId(sessionId)
+            callbacksRef.current.onSessionStart?.(sessionId)
+          }
+
+          await unifiedApi.sendMessageStreaming(sessionId, content.trim(), {
+            onToolCall: (tool) => {
+              const toolCall: ToolCall = {
+                id: generateId('tc'),
+                name: tool.name,
+                arguments: tool.arguments
+              }
+              // Store in ref for onToolResult to access (avoids stale closure)
+              currentToolExecutionRef.current = toolCall
+              setCurrentToolExecution(toolCall)
+              callbacksRef.current.onToolStart?.(toolCall)
+            },
+            onToolResult: (result) => {
+              // Use ref to get the latest tool call ID (state would be stale)
+              const toolResult: ToolResult = {
+                toolCallId: currentToolExecutionRef.current?.id || '',
+                name: result.tool,
+                result: result.content,
+                success: result.success
+              }
+              callbacksRef.current.onToolComplete?.(toolResult)
+            },
+            onDone: (finalContent) => {
+              setIsStreaming(false)
+              currentToolExecutionRef.current = null
+              setCurrentToolExecution(null)
+
+              const assistantMessage: Message = {
+                id: generateId('msg'),
+                role: 'assistant',
+                content: finalContent,
+                timestamp: new Date()
+              }
+              setMessages((prev) => [...prev, assistantMessage])
+              callbacksRef.current.onMessage?.(assistantMessage)
+            },
+            onError: (errorMsg) => {
+              setIsStreaming(false)
+              setError(new Error(errorMsg))
+            }
+          })
+        } catch (err) {
+          setIsStreaming(false)
+          setError(err instanceof Error ? err : new Error('Failed to send message'))
+        }
+      } else {
+        // HTTP mode: use WebSocket (existing behavior)
+        send({
+          message: content.trim(),
+          conversation_id: conversationId || undefined
+        })
+      }
     },
-    [conversationId, send]
+    [conversationId, send, isDesktop]
   )
 
   const clearMessages = useCallback(() => {
@@ -293,7 +362,16 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     setError(null)
 
     try {
-      const loadedMessages = await getSessionMessages(id)
+      let loadedMessages: Message[]
+
+      if (isDesktop) {
+        // Desktop mode: use unified API
+        loadedMessages = await unifiedApi.getSessionMessages(id)
+      } else {
+        // HTTP mode: use existing API
+        loadedMessages = await getSessionMessages(id)
+      }
+
       // Convert date strings to Date objects
       const messagesWithDates = loadedMessages.map((m) => ({
         ...m,
@@ -306,7 +384,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isDesktop])
 
   const startNewConversation = useCallback(() => {
     clearMessages()

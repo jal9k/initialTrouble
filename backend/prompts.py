@@ -22,8 +22,28 @@ class AgentType(Enum):
     LINUX = "linux"          # Linux specialist
 
 
-# Prompt directory relative to this file
-PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
+def _get_prompts_dir() -> Path:
+    """
+    Get the prompts directory, supporting both development and bundled modes.
+    
+    Returns:
+        Path to the prompts directory
+    """
+    # Try using settings first (handles bundled mode)
+    try:
+        from .config import get_settings
+        settings = get_settings()
+        if settings.prompts_path.exists():
+            return settings.prompts_path
+    except Exception:
+        pass
+    
+    # Fallback to relative path (development)
+    return Path(__file__).parent.parent / "prompts"
+
+
+# Prompt directory - computed at module load
+PROMPTS_DIR = _get_prompts_dir()
 
 
 @lru_cache(maxsize=10)
@@ -89,4 +109,13 @@ def list_available_prompts() -> list[dict]:
         })
     
     return prompts
+
+
+def clear_prompt_cache() -> None:
+    """
+    Clear the prompt cache.
+    
+    Call this if prompts are modified during runtime (development only).
+    """
+    load_prompt.cache_clear()
 

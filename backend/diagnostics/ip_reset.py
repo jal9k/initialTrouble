@@ -400,19 +400,17 @@ class FlushDns(BaseDiagnostic):
             result = await self.executor.run(cmd, shell=True, timeout=10)
             if result.stdout:
                 outputs.append(result.stdout)
-            if result.stderr and "permission denied" not in result.stderr.lower():
+            # Check for permission issues during first execution
+            if result.stderr:
+                stderr_lower = result.stderr.lower()
+                if "permission denied" in stderr_lower or "operation not permitted" in stderr_lower:
+                    return self._failure(
+                        error="Administrator privileges may be required",
+                        suggestions=[
+                            "Run with sudo: sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder",
+                        ],
+                    )
                 errors.append(result.stderr)
-
-        # Check if we hit permission issues
-        for cmd in cmds:
-            result = await self.executor.run(cmd, shell=True, timeout=10)
-            if "permission denied" in result.stderr.lower() or "operation not permitted" in result.stderr.lower():
-                return self._failure(
-                    error="Administrator privileges may be required",
-                    suggestions=[
-                        "Run with sudo: sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder",
-                    ],
-                )
 
         return self._success(
             data={

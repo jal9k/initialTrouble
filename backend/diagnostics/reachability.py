@@ -147,7 +147,7 @@ class PingAddress(BaseDiagnostic):
 
         # Calculate packet loss
         if packets_sent == 0:
-            packets_sent = len(results) if results else count if 'count' in dir() else 4
+            packets_sent = len(results) if results else 4
             packets_received = sum(1 for r in results if r["success"])
 
         packet_loss = (

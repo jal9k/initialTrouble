@@ -146,25 +146,8 @@ class ToolRegistry:
         })
         # #endregion
         
-        # #region agent log - H-C: Log expected vs received params for ping_gateway
-        if tool_call.name == "ping_gateway":
-            import json as _json
-            import time as _time
-            with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as _f:
-                definition = self.get_definition("ping_gateway")
-                expected_params = [p.name for p in definition.parameters] if definition else []
-                _f.write(_json.dumps({"location": "registry:ping_gateway_exec", "message": "ping_gateway execution attempt", "data": {"received_args": tool_call.arguments, "received_keys": list(tool_call.arguments.keys()), "expected_params": expected_params, "match": all(k in expected_params or k == "count" for k in tool_call.arguments.keys())}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-C"}) + "\n")
-        # #endregion
-        
-        # #region agent log - H-FIX: Normalize arguments before execution
-        original_args = dict(tool_call.arguments)
+        # Normalize arguments before execution
         tool_call.arguments = normalize_arguments(tool_call.name, tool_call.arguments)
-        if original_args != tool_call.arguments:
-            import json as _json
-            import time as _time
-            with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as _f:
-                _f.write(_json.dumps({"location": "registry:normalize", "message": "Arguments normalized", "data": {"tool": tool_call.name, "original": original_args, "normalized": tool_call.arguments}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-FIX"}) + "\n")
-        # #endregion
         
         tool = self.get_tool(tool_call.name)
         logger.info(f"Executing tool: {tool_call.name} with args: {tool_call.arguments}")

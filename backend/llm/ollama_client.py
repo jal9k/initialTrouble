@@ -9,11 +9,7 @@ import httpx
 from ..tools.schemas import ToolCall, ToolDefinition
 from .base import BaseLLMClient, ChatMessage, ChatResponse
 
-# #region agent log
-def _ollama_dbg(loc: str, msg: str, data: dict, hyp: str = "OLLAMA"):
-    with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as f:
-        f.write(json.dumps({"location": loc, "message": msg, "data": data, "timestamp": int(time.time()*1000), "sessionId": "debug-session", "hypothesisId": hyp}) + "\n")
-# #endregion
+# Debug logging removed - was writing to hardcoded local path
 
 
 class OllamaClient(BaseLLMClient):
@@ -75,13 +71,6 @@ class OllamaClient(BaseLLMClient):
         if tools:
             payload["tools"] = [t.to_ollama_schema() for t in tools]
             
-            # #region agent log - H-A: Log full schema for ping_gateway
-            for t in tools:
-                if t.name == "ping_gateway":
-                    schema = t.to_ollama_schema()
-                    _ollama_dbg("ollama:ping_gateway_schema", "ping_gateway schema being sent", {"full_schema": schema, "parameters": [p.name for p in t.parameters]}, "H-A")
-            # #endregion
-            
             # #region debug
             # Workaround: Ollama doesn't fully support tool_choice, so inject instruction
             if tool_choice == "required":
@@ -95,10 +84,6 @@ class OllamaClient(BaseLLMClient):
                     payload["messages"] = ollama_messages
             # #endregion
 
-        # #region agent log
-        _ollama_dbg("ollama:chat:request", "Sending to Ollama", {"model": self.model, "msg_count": len(ollama_messages), "has_tools": tools is not None, "tool_count": len(tools) if tools else 0, "tool_names": [t.name for t in tools] if tools else [], "tool_choice": str(tool_choice)}, "H-OLLAMA")
-        # #endregion
-
         # Make request
         response = await self._client.post(
             f"{self.host}/api/chat",
@@ -108,11 +93,6 @@ class OllamaClient(BaseLLMClient):
 
         data = response.json()
         message_data = data.get("message", {})
-        # #region agent log
-        _ollama_dbg("ollama:chat:response", "Ollama response received", {"has_tool_calls": "tool_calls" in message_data, "content_len": len(message_data.get("content", "")) if message_data.get("content") else 0, "done_reason": data.get("done_reason")}, "H-OLLAMA")
-        if "tool_calls" in message_data:
-            _ollama_dbg("ollama:chat:tool_calls", "Tool calls in response", {"tool_calls": message_data["tool_calls"]}, "H-OLLAMA")
-        # #endregion
 
         # Parse tool calls if present
         tool_calls = None
@@ -123,11 +103,6 @@ class OllamaClient(BaseLLMClient):
                 args = func.get("arguments", "{}")
                 if isinstance(args, str):
                     args = json.loads(args)
-
-                # #region agent log - H-B: Log raw tool call from LLM for ping_gateway
-                if func.get("name") == "ping_gateway":
-                    _ollama_dbg("ollama:ping_gateway_call", "ping_gateway called by LLM", {"raw_args": args, "arg_keys": list(args.keys()) if isinstance(args, dict) else "not_dict"}, "H-B")
-                # #endregion
 
                 tool_calls.append(
                     ToolCall(

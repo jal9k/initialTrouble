@@ -170,10 +170,7 @@ PARAMETERS: gateway (string, optional) - Gateway IP to ping. count (number, opti
     )(ping_gateway)
     
     # #region agent log - H-D: Log ping_gateway registration
-    import json as _json
-    import time as _time
-    with open("/Users/tyurgal/Documents/python/diag/network-diag/.cursor/debug.log", "a") as _f:
-        _f.write(_json.dumps({"location": "diagnostics:registration", "message": "ping_gateway registered", "data": {"registered": "ping_gateway" in registry._definitions, "param_names": ["gateway", "count"]}, "timestamp": int(_time.time()*1000), "sessionId": "debug-session", "hypothesisId": "H-D"}) + "\n")
+    # Debug logging removed - was writing to hardcoded local path
     # #endregion
 
     # =========================================================================

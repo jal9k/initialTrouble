@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Header } from '@/components/layout/Header'
+import { AppInitializer } from '@/components/loading/AppInitializer'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -27,10 +28,12 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <TooltipProvider>
-            <div className="relative min-h-screen flex flex-col">
-              <Header />
-              <main className="flex-1">{children}</main>
-            </div>
+            <AppInitializer>
+              <div className="relative min-h-screen flex flex-col">
+                <Header />
+                <main className="flex-1">{children}</main>
+              </div>
+            </AppInitializer>
           </TooltipProvider>
         </ThemeProvider>
       </body>

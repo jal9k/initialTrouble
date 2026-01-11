@@ -388,7 +388,7 @@ class TestVPNConnectivity(BaseDiagnostic):
                 f"ping -c 1 -W 3 {endpoint}",
                 shell=True,
             )
-            return result.success and "1 received" in result.stdout or "1 packets received" in result.stdout
+            return result.success and ("1 received" in result.stdout or "1 packets received" in result.stdout)
 
     def _generate_suggestions(
         self,

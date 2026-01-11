@@ -20,6 +20,8 @@ export interface UseWebSocketOptions {
   onOpen?: () => void
   onClose?: (event: CloseEvent) => void
   onError?: (error: Event) => void
+  /** Whether WebSocket connection is enabled. When false, no connection is made. Default: true */
+  enabled?: boolean
 }
 
 // ============================================================================
@@ -58,7 +60,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     onMessage,
     onOpen,
     onClose,
-    onError
+    onError,
+    enabled = true
   } = options
 
   // State
@@ -84,6 +87,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 
   // Initialize WebSocket client
   useEffect(() => {
+    // Skip connection if disabled (e.g., in desktop/PyWebView mode)
+    if (!enabled) {
+      return
+    }
+
     wsRef.current = new ChatWebSocket({
       url,
       reconnect,
@@ -129,7 +137,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     return () => {
       wsRef.current?.disconnect()
     }
-  }, [url, reconnect, reconnectInterval, maxReconnectAttempts, autoConnect])
+  }, [url, reconnect, reconnectInterval, maxReconnectAttempts, autoConnect, enabled])
 
   // Actions
   const connect = useCallback(() => {

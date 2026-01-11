@@ -213,6 +213,12 @@ export function ChatPageClient({
     isFirstMessageRef.current = true
   }, [activeSessionId])
 
+  // Fetch sessions on mount (for static export compatibility)
+  // Since the page is now statically exported, we need to fetch sessions client-side
+  useEffect(() => {
+    refetchSessions()
+  }, [refetchSessions])
+
   const handleToggleSidebar = useCallback(() => {
     setSidebarCollapsed(prev => !prev)
   }, [])
