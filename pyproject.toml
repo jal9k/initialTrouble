@@ -23,10 +23,6 @@ classifiers = [
 ]
 
 dependencies = [
-    "fastapi>=0.109.0",
-    "uvicorn[standard]>=0.27.0",
-    "websockets>=12.0",
-    "python-multipart>=0.0.6",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "httpx>=0.26.0",
@@ -35,18 +31,47 @@ dependencies = [
     "typer>=0.9.0",
     "ollama>=0.1.6",
     "openai>=1.10.0",
-    "pywebview>=5.0",
 ]
 
 [project.optional-dependencies]
+# Backend server dependencies
+server = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "websockets>=12.0",
+    "python-multipart>=0.0.6",
+]
+
+# Desktop application dependencies
+desktop = [
+    "pywebview>=5.0",
+    "httpx>=0.26.0",
+]
+
+# Build and distribution dependencies
+build = [
+    "pyinstaller>=6.0",
+]
+
+# Development dependencies
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+
+# All dependencies for full development
+all = [
+    "techtime[server,desktop,build,dev]",
 ]
 
 [project.scripts]
+# CLI entry points
 techtime = "backend.cli:main"
+techtime-server = "backend.cli:run_server"
+techtime-desktop = "desktop_main:main"
 
 [project.urls]
 Homepage = "https://github.com/example/techtime"

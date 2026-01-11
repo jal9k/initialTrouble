@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from backend.config import get_settings
 from backend.chat_service import ChatService, StreamChunk
+from backend.preferences import get_preferences
 from backend.tools import get_registry
 from backend.tools.schemas import ToolCall as ToolCallSchema
 
@@ -562,5 +563,112 @@ class TechTimApi:
             ])
         except Exception as e:
             logger.exception("Error getting tool stats")
+            return api_response(False, error=str(e))
+    
+    # =========================================================================
+    # User Preferences
+    # =========================================================================
+    
+    def get_preferences(self) -> dict:
+        """
+        Get all user preferences.
+        
+        Returns:
+            API response with preferences object
+        """
+        try:
+            prefs = get_preferences()
+            return api_response(True, prefs.all.to_dict())
+        except Exception as e:
+            logger.exception("Error getting preferences")
+            return api_response(False, error=str(e))
+    
+    def get_preference(self, key: str) -> dict:
+        """
+        Get a specific preference value.
+        
+        Args:
+            key: Preference key (e.g., "theme", "window.width")
+        
+        Returns:
+            API response with preference value
+        """
+        try:
+            prefs = get_preferences()
+            value = prefs.get(key)
+            return api_response(True, {'key': key, 'value': value})
+        except Exception as e:
+            logger.exception(f"Error getting preference {key}")
+            return api_response(False, error=str(e))
+    
+    def set_preference(self, key: str, value: Any) -> dict:
+        """
+        Set a preference value and save.
+        
+        Args:
+            key: Preference key
+            value: New value
+        
+        Returns:
+            API response indicating success
+        """
+        try:
+            prefs = get_preferences()
+            prefs.set(key, value)
+            if not prefs.save():
+                return api_response(False, error="Failed to save preferences to disk")
+            return api_response(True, {'key': key, 'value': value})
+        except Exception as e:
+            logger.exception(f"Error setting preference {key}")
+            return api_response(False, error=str(e))
+    
+    def save_window_state(
+        self,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        maximized: bool = False,
+    ) -> dict:
+        """
+        Save current window position and size.
+        
+        Called by frontend when window is moved/resized.
+        
+        Args:
+            x: Window x position
+            y: Window y position
+            width: Window width
+            height: Window height
+            maximized: Whether window is maximized
+        
+        Returns:
+            API response indicating success
+        """
+        try:
+            prefs = get_preferences()
+            prefs.update_window_state(x, y, width, height, maximized)
+            if not prefs.save():
+                return api_response(False, error="Failed to save window state to disk")
+            return api_response(True, {'saved': True})
+        except Exception as e:
+            logger.exception("Error saving window state")
+            return api_response(False, error=str(e))
+    
+    def reset_preferences(self) -> dict:
+        """
+        Reset all preferences to defaults.
+        
+        Returns:
+            API response with default preferences
+        """
+        try:
+            prefs = get_preferences()
+            prefs.reset()
+            if not prefs.save():
+                return api_response(False, error="Failed to save reset preferences to disk")
+            return api_response(True, prefs.all.to_dict())
+        except Exception as e:
+            logger.exception("Error resetting preferences")
             return api_response(False, error=str(e))
 

@@ -23,9 +23,11 @@ import webview
 
 from backend.config import get_settings
 from backend.logging_config import setup_logging
+from backend.preferences import get_preferences
 from desktop.ollama_manager import OllamaManager
 from desktop.api import TechTimApi
 from desktop.exceptions import OllamaNotFoundError, OllamaStartupError
+from desktop.process_guard import cleanup_orphaned_ollama, ProcessGuard
 
 logger = logging.getLogger("techtime.desktop")
 
@@ -211,26 +213,50 @@ def main():
     logger.info(f"User data path: {settings.user_data_path}")
     logger.info(f"Database path: {settings.database_path}")
     
+    # Clean up any orphaned Ollama processes from previous crashes
+    if cleanup_orphaned_ollama():
+        logger.info("Cleaned up orphaned Ollama process from previous session")
+    
     # Ensure directories exist
     settings.log_path.mkdir(parents=True, exist_ok=True)
     settings.models_path.mkdir(parents=True, exist_ok=True)
     
+    # Load user preferences
+    prefs = get_preferences()
+    
     # Create managers
     ollama_manager = OllamaManager()
+    process_guard = ProcessGuard("ollama")
     api = TechTimApi(ollama_manager)
+    
+    # Store process guard reference for Ollama PID tracking
+    original_start = ollama_manager.start
+    
+    async def tracked_start(timeout: float = 30.0) -> None:
+        """Wrapper to track Ollama PID after startup."""
+        await original_start(timeout=timeout)
+        if ollama_manager.process:
+            process_guard.register_pid(ollama_manager.process.pid)
+    
+    ollama_manager.start = tracked_start
     
     try:
         # Get frontend URL
         frontend_url = get_frontend_url(args.dev, args.port)
         logger.info(f"Loading frontend from: {frontend_url}")
         
-        # Create window
+        # Get window state from preferences
+        window_prefs = prefs.all.window
+        
+        # Create window with saved position/size (dev mode ignores saved position)
         window = webview.create_window(
             title='TechTim(e)',
             url=frontend_url,
             js_api=api,
-            width=1200,
-            height=800,
+            x=window_prefs.x if not args.dev else None,
+            y=window_prefs.y if not args.dev else None,
+            width=window_prefs.width,
+            height=window_prefs.height,
             min_size=(800, 600),
             confirm_close=True,
         )
@@ -298,10 +324,17 @@ def main():
         sys.exit(1)
     
     finally:
-        # Cleanup
+        # Clean shutdown
         logger.info("Shutting down...")
-        ollama_manager.stop()
-        logger.info("Goodbye!")
+        
+        # Stop Ollama
+        if ollama_manager.is_running():
+            ollama_manager.stop()
+        
+        # Clean up PID file
+        process_guard.unregister()
+        
+        logger.info("Shutdown complete")
 
 
 if __name__ == '__main__':
