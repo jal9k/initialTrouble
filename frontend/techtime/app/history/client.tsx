@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { cn, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -13,13 +14,10 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Search, Filter, Clock, ArrowRight } from 'lucide-react'
+import { Search, Filter, Clock, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
+import { listSessions } from '@/lib/api'
 import type { SessionListItem, SessionOutcome, IssueCategory } from '@/types'
-
-interface HistoryPageClientProps {
-  sessions: SessionListItem[]
-}
 
 const outcomeBadgeStyles: Record<SessionOutcome, string> = {
   resolved: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -37,34 +35,56 @@ const categoryLabels: Record<IssueCategory, string> = {
   unknown: 'Unknown'
 }
 
-export function HistoryPageClient({ sessions }: HistoryPageClientProps) {
+export function HistoryPageClient() {
+  // Data state
+  const [sessions, setSessions] = useState<SessionListItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [totalSessions, setTotalSessions] = useState(0)
+  
+  // Filter state
   const [searchQuery, setSearchQuery] = useState('')
   const [outcomeFilter, setOutcomeFilter] = useState<SessionOutcome | 'all'>('all')
   const [categoryFilter, setCategoryFilter] = useState<IssueCategory | 'all'>('all')
 
-  const filteredSessions = useMemo(() => {
-    return sessions.filter(session => {
-      // Search filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase()
-        if (!session.preview.toLowerCase().includes(query)) {
-          return false
-        }
-      }
+  // Fetch sessions from API
+  const fetchSessions = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      const result = await listSessions({
+        pageSize: 50,
+        outcome: outcomeFilter !== 'all' ? outcomeFilter : undefined,
+        category: categoryFilter !== 'all' ? categoryFilter : undefined,
+      })
+      
+      setSessions(result.items)
+      setTotalSessions(result.total)
+    } catch (err) {
+      console.error('Failed to fetch sessions:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load sessions')
+      setSessions([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [outcomeFilter, categoryFilter])
 
-      // Outcome filter
-      if (outcomeFilter !== 'all' && session.outcome !== outcomeFilter) {
+  // Fetch on mount and when filters change
+  useEffect(() => {
+    fetchSessions()
+  }, [fetchSessions])
+
+  // Client-side search filtering (API doesn't support search)
+  const filteredSessions = sessions.filter(session => {
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      if (!session.preview.toLowerCase().includes(query)) {
         return false
       }
-
-      // Category filter
-      if (categoryFilter !== 'all' && session.issueCategory !== categoryFilter) {
-        return false
-      }
-
-      return true
-    })
-  }, [sessions, searchQuery, outcomeFilter, categoryFilter])
+    }
+    return true
+  })
 
   const clearFilters = () => {
     setSearchQuery('')
@@ -80,7 +100,7 @@ export function HistoryPageClient({ sessions }: HistoryPageClientProps) {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Session History</h1>
         <p className="text-muted-foreground">
-          Browse and search through past diagnostic sessions
+          Browse and search through past support sessions
         </p>
       </div>
 
@@ -142,11 +162,60 @@ export function HistoryPageClient({ sessions }: HistoryPageClientProps) {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {filteredSessions.length} session{filteredSessions.length !== 1 ? 's' : ''} found
+            {isLoading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : (
+              `${filteredSessions.length} session${filteredSessions.length !== 1 ? 's' : ''} found`
+            )}
           </p>
+          {!isLoading && (
+            <Button variant="ghost" size="sm" onClick={fetchSessions}>
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Refresh
+            </Button>
+          )}
         </div>
 
-        {filteredSessions.length === 0 ? (
+        {/* Loading State */}
+        {isLoading && (
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                      <Skeleton className="h-5 w-full max-w-md" />
+                      <Skeleton className="h-4 w-40" />
+                    </div>
+                    <Skeleton className="h-9 w-20" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Error State */}
+        {!isLoading && error && (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
+              <h3 className="font-semibold mb-2">Failed to load sessions</h3>
+              <p className="text-sm text-muted-foreground mb-4">{error}</p>
+              <Button variant="outline" onClick={fetchSessions}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try again
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && !error && filteredSessions.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
               <Filter className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -154,7 +223,7 @@ export function HistoryPageClient({ sessions }: HistoryPageClientProps) {
               <p className="text-sm text-muted-foreground mb-4">
                 {hasActiveFilters
                   ? 'Try adjusting your filters'
-                  : 'No diagnostic sessions have been recorded yet'}
+                  : 'No support sessions have been recorded yet'}
               </p>
               {hasActiveFilters && (
                 <Button variant="outline" onClick={clearFilters}>
@@ -163,7 +232,10 @@ export function HistoryPageClient({ sessions }: HistoryPageClientProps) {
               )}
             </CardContent>
           </Card>
-        ) : (
+        )}
+
+        {/* Sessions List */}
+        {!isLoading && !error && filteredSessions.length > 0 && (
           <div className="space-y-3">
             {filteredSessions.map((session) => (
               <Card key={session.id} className="hover:bg-muted/50 transition-colors">
@@ -207,4 +279,3 @@ export function HistoryPageClient({ sessions }: HistoryPageClientProps) {
     </div>
   )
 }
-

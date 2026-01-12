@@ -210,6 +210,7 @@ async def list_sessions(
     page: int = 1,
     page_size: int = 20,
     outcome: str | None = None,
+    category: str | None = None,
 ) -> SessionListResponse:
     """List sessions for the frontend sidebar."""
     if not state.analytics_storage:
@@ -219,7 +220,7 @@ async def list_sessions(
     offset = (page - 1) * page_size
     
     # Get sessions from storage
-    from analytics.models import SessionOutcome as AnalyticsOutcome
+    from analytics.models import SessionOutcome as AnalyticsOutcome, IssueCategory
     outcome_filter = None
     if outcome:
         try:
@@ -227,8 +228,16 @@ async def list_sessions(
         except ValueError:
             pass
     
+    category_filter = None
+    if category:
+        try:
+            category_filter = IssueCategory(category)
+        except ValueError:
+            pass
+    
     sessions = state.analytics_storage.get_sessions(
         outcome=outcome_filter,
+        category=category_filter,
         limit=page_size + 1,  # Get one extra to check if there are more
         offset=offset,
     )

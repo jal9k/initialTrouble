@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Fragment } from 'react'
 import { cn, formatDate, truncate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 import {
   Tooltip,
   TooltipContent,
@@ -163,7 +164,7 @@ export function Sidebar({
       </div>
 
       {/* Session List */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1" viewportClassName="pr-5">
         <div className={cn('py-2', isCollapsed ? 'px-2' : 'px-3')}>
           {isLoading ? (
             // Loading skeletons
@@ -204,149 +205,155 @@ export function Sidebar({
             </div>
           ) : (
             // Session items
-            filteredSessions.map(session => {
+            filteredSessions.map((session, index) => {
               const OutcomeIcon = outcomeIcons[session.outcome]
               const isActive = activeSessionId === session.id
+              const isLast = index === filteredSessions.length - 1
 
               if (isCollapsed) {
                 return (
-                  <Tooltip key={session.id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => onSessionSelect(session.id)}
-                        className={cn(
-                          'w-full p-2 rounded-lg transition-all duration-200 mb-1',
-                          'hover:bg-muted hover:scale-105',
-                          'border-2',
-                          isActive
-                            ? 'bg-primary/10 border-primary shadow-sm'
-                            : 'border-transparent'
-                        )}
-                      >
+                  <Fragment key={session.id}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => onSessionSelect(session.id)}
+                          className={cn(
+                            'w-full p-2 rounded-lg transition-all duration-200 mb-1',
+                            'hover:bg-muted hover:scale-105',
+                            'border-2',
+                            isActive
+                              ? 'bg-primary/10 border-primary shadow-sm'
+                              : 'border-transparent'
+                          )}
+                        >
+                          <OutcomeIcon className={cn(
+                            'h-5 w-5 mx-auto',
+                            session.outcome === 'resolved' && 'text-emerald-500',
+                            session.outcome === 'unresolved' && 'text-amber-500',
+                            session.outcome === 'abandoned' && 'text-gray-500',
+                            session.outcome === 'in_progress' && 'text-blue-500'
+                          )} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-[200px]">
+                        <p className="font-medium">{truncate(session.preview, 40)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatDate(session.startTime, 'relative')}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                    {!isLast && <Separator className="my-1 opacity-50" />}
+                  </Fragment>
+                )
+              }
+
+              return (
+                <Fragment key={session.id}>
+                  <div
+                    className={cn(
+                      'w-full text-left p-3 rounded-xl transition-all duration-200 mb-1',
+                      'hover:bg-muted/80 hover:shadow-sm',
+                      'border-2 group cursor-pointer',
+                      isActive
+                        ? 'bg-primary/10 border-primary/50 shadow-sm'
+                        : 'border-transparent hover:border-muted-foreground/10'
+                    )}
+                    onClick={() => onSessionSelect(session.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        'shrink-0 p-1.5 rounded-lg',
+                        session.outcome === 'resolved' && 'bg-emerald-500/10',
+                        session.outcome === 'unresolved' && 'bg-amber-500/10',
+                        session.outcome === 'abandoned' && 'bg-gray-500/10',
+                        session.outcome === 'in_progress' && 'bg-blue-500/10'
+                      )}>
                         <OutcomeIcon className={cn(
-                          'h-5 w-5 mx-auto',
+                          'h-4 w-4',
                           session.outcome === 'resolved' && 'text-emerald-500',
                           session.outcome === 'unresolved' && 'text-amber-500',
                           session.outcome === 'abandoned' && 'text-gray-500',
                           session.outcome === 'in_progress' && 'text-blue-500'
                         )} />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-[200px]">
-                      <p className="font-medium">{truncate(session.preview, 40)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatDate(session.startTime, 'relative')}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                )
-              }
-
-              return (
-                <div
-                  key={session.id}
-                  className={cn(
-                    'w-full text-left p-3 rounded-xl transition-all duration-200 mb-1',
-                    'hover:bg-muted/80 hover:shadow-sm',
-                    'border-2 group cursor-pointer',
-                    isActive
-                      ? 'bg-primary/10 border-primary/50 shadow-sm'
-                      : 'border-transparent hover:border-muted-foreground/10'
-                  )}
-                  onClick={() => onSessionSelect(session.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={cn(
-                      'shrink-0 p-1.5 rounded-lg',
-                      session.outcome === 'resolved' && 'bg-emerald-500/10',
-                      session.outcome === 'unresolved' && 'bg-amber-500/10',
-                      session.outcome === 'abandoned' && 'bg-gray-500/10',
-                      session.outcome === 'in_progress' && 'bg-blue-500/10'
-                    )}>
-                      <OutcomeIcon className={cn(
-                        'h-4 w-4',
-                        session.outcome === 'resolved' && 'text-emerald-500',
-                        session.outcome === 'unresolved' && 'text-amber-500',
-                        session.outcome === 'abandoned' && 'text-gray-500',
-                        session.outcome === 'in_progress' && 'text-blue-500'
-                      )} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                          {truncate(session.preview, 28)}
-                        </p>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:bg-muted"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            {onRenameSession && (
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onRenameSession(session.id)
-                                }}
-                              >
-                                <Edit3 className="h-4 w-4 mr-2" />
-                                Rename
-                              </DropdownMenuItem>
-                            )}
-                            {onArchiveSession && (
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onArchiveSession(session.id)
-                                }}
-                              >
-                                <Archive className="h-4 w-4 mr-2" />
-                                Archive
-                              </DropdownMenuItem>
-                            )}
-                            {(onRenameSession || onArchiveSession) && onDeleteSession && (
-                              <DropdownMenuSeparator />
-                            )}
-                            {onDeleteSession && (
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onDeleteSession(session.id)
-                                }}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(session.startTime, 'relative')}
-                        </span>
-                        {session.issueCategory && (
-                          <>
-                            <span className="text-muted-foreground/30">•</span>
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] px-1.5 py-0 h-4 font-normal"
-                            >
-                              {session.issueCategory}
-                            </Badge>
-                          </>
-                        )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                            {truncate(session.preview, 28)}
+                          </p>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:bg-muted"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              {onRenameSession && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onRenameSession(session.id)
+                                  }}
+                                >
+                                  <Edit3 className="h-4 w-4 mr-2" />
+                                  Rename
+                                </DropdownMenuItem>
+                              )}
+                              {onArchiveSession && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onArchiveSession(session.id)
+                                  }}
+                                >
+                                  <Archive className="h-4 w-4 mr-2" />
+                                  Archive
+                                </DropdownMenuItem>
+                              )}
+                              {(onRenameSession || onArchiveSession) && onDeleteSession && (
+                                <DropdownMenuSeparator />
+                              )}
+                              {onDeleteSession && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onDeleteSession(session.id)
+                                  }}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(session.startTime, 'relative')}
+                          </span>
+                          {session.issueCategory && (
+                            <>
+                              <span className="text-muted-foreground/30">•</span>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-4 font-normal"
+                              >
+                                {session.issueCategory}
+                              </Badge>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                  {!isLast && <Separator className="my-2 opacity-40" />}
+                </Fragment>
               )
             })
           )}

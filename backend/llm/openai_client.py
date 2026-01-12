@@ -1,7 +1,18 @@
-"""OpenAI LLM client implementation."""
+"""OpenAI LLM client implementation.
+
+DEPRECATED: Superseded by gluellm_wrapper.py in Phase 8.
+Kept for rollback capability. Delete in Phase 9.
+"""
 
 import json
+import warnings
 from typing import Any
+
+warnings.warn(
+    "OpenAIClient is deprecated. Use GlueLLMWrapper instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from openai import AsyncOpenAI
 

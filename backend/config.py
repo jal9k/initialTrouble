@@ -100,18 +100,42 @@ class Settings(BaseSettings):
     )
 
     # =========================================================================
-    # LLM Configuration (EXISTING)
+    # LLM Configuration - Cloud-First with Ollama Fallback
     # =========================================================================
     
-    llm_backend: Literal["ollama", "openai"] = "ollama"
+    # Provider priority (checked in order when online)
+    # Set via PROVIDER_PRIORITY env var as comma-separated list
+    provider_priority: list[str] = ["openai", "anthropic", "xai", "google", "ollama"]
     
-    # Ollama Configuration
+    # OpenAI Configuration (Primary cloud provider)
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o"
+    
+    # Anthropic Configuration
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-3-5-sonnet-20241022"
+    
+    # xAI/Grok Configuration
+    xai_api_key: str | None = None
+    xai_model: str = "grok-2"
+    
+    # Google/Gemini Configuration
+    google_api_key: str | None = None
+    google_model: str = "gemini-1.5-pro"
+    
+    # Ollama Configuration (Fallback - always running sidecar)
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "ministral-3:3b"
     
-    # OpenAI Configuration
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    # Connectivity detection
+    connectivity_check_url: str = "https://api.openai.com"
+    connectivity_timeout_ms: int = 3000
+    
+    # GlueLLM settings
+    gluellm_max_tool_iterations: int = 10
+    
+    # Legacy setting (deprecated, kept for compatibility)
+    llm_backend: Literal["ollama", "openai"] = "ollama"
 
     # =========================================================================
     # Server Configuration (EXISTING)

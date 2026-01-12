@@ -2,26 +2,24 @@
 Core chat service for TechTim(e).
 
 This module contains the ChatService class which orchestrates conversations
-with the LLM, including multi-turn tool execution. It is designed to be
-called either from:
+with the LLM. It is designed to be called either from:
 - FastAPI routes (HTTP/WebSocket mode)
 - PyWebView API bridge (desktop mode)
 
 The service is stateful and maintains conversation history per session.
 
-NOTE: This is extracted from main.py to support desktop mode while
-preserving all existing patterns including analytics integration.
+NOTE: Tool execution is now handled automatically by GlueLLM via the
+GlueLLMWrapper class. This service focuses on session management,
+analytics persistence, and response formatting.
 """
-import asyncio
 import uuid
 import logging
-import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Any
 from datetime import datetime
 
 from .config import get_settings
-from .llm import LLMRouter, ChatMessage
+from .llm import ChatMessage, GlueLLMWrapper
 from .tools import ToolRegistry, get_registry
 from .prompts import AgentType, load_prompt
 
@@ -102,16 +100,15 @@ class StreamChunk:
 
 class ChatService:
     """
-    Orchestrates chat interactions with LLM and tool execution.
+    Orchestrates chat interactions with LLM via GlueLLM.
     
-    This service manages the conversation loop where:
-    1. User sends a message
-    2. LLM processes and may request tool calls
-    3. Tools are executed
-    4. Results are fed back to LLM
-    5. Loop continues until LLM provides a final response
+    This service manages:
+    1. Session/conversation state
+    2. Analytics persistence
+    3. Response formatting
     
-    The service integrates with analytics for session tracking.
+    Tool execution is handled automatically by GlueLLM through the
+    GlueLLMWrapper class.
     
     Example:
         service = ChatService()
@@ -122,7 +119,7 @@ class ChatService:
     
     def __init__(
         self,
-        llm_router: LLMRouter | None = None,
+        gluellm_wrapper: GlueLLMWrapper | None = None,
         tool_registry: ToolRegistry | None = None,
         analytics_collector: "AnalyticsCollector | None" = None,
         analytics_storage: "AnalyticsStorage | None" = None,
@@ -131,13 +128,13 @@ class ChatService:
         Initialize the chat service.
         
         Args:
-            llm_router: LLM client router. If None, creates on initialize().
+            gluellm_wrapper: GlueLLM wrapper. If None, creates on initialize().
             tool_registry: Tool registry. If None, uses the global registry.
             analytics_collector: Analytics collector for tracking.
             analytics_storage: Analytics storage for persistence.
         """
         self._settings = get_settings()
-        self._llm_router = llm_router
+        self._gluellm_wrapper = gluellm_wrapper
         self._tool_registry = tool_registry
         self._analytics_collector = analytics_collector
         self._analytics_storage = analytics_storage
@@ -152,33 +149,30 @@ class ChatService:
         """
         Initialize the service (call once at startup).
         
-        This sets up the LLM router, tool registry, and analytics.
+        This sets up the GlueLLM wrapper, tool registry, and analytics.
         """
         if self._initialized:
             return
         
-        # Initialize LLM router
-        if self._llm_router is None:
-            self._llm_router = LLMRouter(
-                self._settings,
-                analytics_collector=self._analytics_collector
-            )
-        
-        # Initialize tool registry
+        # Initialize tool registry first (GlueLLM wrapper needs it)
         if self._tool_registry is None:
             self._tool_registry = get_registry()
-        
-        # Connect analytics to tool registry
-        if self._analytics_collector and self._tool_registry:
-            self._tool_registry.set_analytics(self._analytics_collector)
         
         # Register diagnostic tools
         from .diagnostics import register_all_diagnostics
         register_all_diagnostics(self._tool_registry)
         
+        # Initialize GlueLLM wrapper with tool registry and analytics
+        if self._gluellm_wrapper is None:
+            self._gluellm_wrapper = GlueLLMWrapper(
+                settings=self._settings,
+                tool_registry=self._tool_registry,
+                analytics_collector=self._analytics_collector,
+            )
+        
         self._initialized = True
         logger.info(
-            f"ChatService initialized with {len(self._tool_registry)} tools"
+            f"ChatService initialized with {len(self._tool_registry)} tools (GlueLLM)"
         )
     
     def set_analytics(
@@ -190,10 +184,8 @@ class ChatService:
         self._analytics_collector = collector
         self._analytics_storage = storage
         
-        if self._llm_router:
-            self._llm_router.set_analytics(collector)
-        if self._tool_registry:
-            self._tool_registry.set_analytics(collector)
+        if self._gluellm_wrapper:
+            self._gluellm_wrapper.set_analytics(collector)
     
     def _get_or_create_conversation(
         self,
@@ -233,13 +225,13 @@ class ChatService:
         """
         Process a chat message and return the complete response.
         
-        This method blocks until the LLM finishes generating its response
-        and all tool calls have been executed.
+        Tool execution is handled automatically by GlueLLM through the
+        GlueLLMWrapper. This method manages session state and analytics.
         
         Args:
             session_id: The conversation session ID (creates new if None)
             user_message: The user's input message
-            max_tool_rounds: Maximum tool execution iterations (default from settings)
+            max_tool_rounds: Maximum tool execution iterations (unused, kept for API compat)
         
         Returns:
             ChatServiceResponse with the assistant's reply and any tool results
@@ -247,20 +239,13 @@ class ChatService:
         if not self._initialized:
             await self.initialize()
         
-        if max_tool_rounds is None:
-            max_tool_rounds = self._settings.max_tool_rounds
-        
         conv_id, messages, is_new = self._get_or_create_conversation(session_id)
-        
-        # Initialize diagnostics tracking
-        diagnostics = ResponseDiagnosticsData()
-        diagnostics.thoughts.append(f"Processing user message: {len(user_message)} chars")
         
         # Record user message in analytics
         if self._analytics_collector:
             self._analytics_collector.record_user_message(user_message)
         
-        # Add user message
+        # Add user message to conversation history
         user_msg = ChatMessage(role="user", content=user_message)
         messages.append(user_msg)
         
@@ -277,117 +262,34 @@ class ChatService:
         
         logger.info(f"[{conv_id}] Processing message: {user_message[:100]}...")
         
-        # Get tool definitions
-        tools = self._tool_registry.get_all_definitions()
-        diagnostics.thoughts.append(f"Available tools: {len(tools)}")
+        # Get system prompt
+        system_prompt = load_prompt(AgentType.DIAGNOSTIC)
         
-        # Multi-turn tool execution loop (from main.py pattern)
-        tool_results: list[dict] = []
+        # Convert messages to dict format for GlueLLM
+        messages_for_llm = [
+            {"role": msg.role, "content": msg.content or ""}
+            for msg in messages
+            if msg.role != "system"  # System prompt passed separately
+        ]
         
-        for iteration in range(max_tool_rounds):
-            # Force tool call on first iteration, allow auto on subsequent
-            tool_choice = "required" if iteration == 0 else "auto"
-            
-            diagnostics.thoughts.append(
-                f"Tool loop iteration {iteration + 1}, tool_choice={tool_choice}"
-            )
-            
-            response = await self._llm_router.chat(
-                messages=messages,
-                tools=tools,
-                temperature=0.3,
-                tool_choice=tool_choice,
-            )
-            
-            # Update session backend info after first LLM call
-            if iteration == 0 and is_new and self._analytics_collector:
-                if self._llm_router.active_backend:
-                    self._analytics_collector.set_session_backend(
-                        backend=self._llm_router.active_backend,
-                        model_name=self._llm_router.active_model or "unknown",
-                        had_fallback=self._llm_router.had_fallback,
-                    )
-            
-            # If no tool calls, we're done with the loop
-            if not response.has_tool_calls or not response.message.tool_calls:
-                diagnostics.thoughts.append(
-                    f"No tool calls in iteration {iteration + 1}, ending loop"
-                )
-                break
-            
-            # Add assistant message with tool_calls to conversation
-            messages.append(response.message)
-            diagnostics.thoughts.append(
-                f"LLM requested {len(response.message.tool_calls)} tool call(s)"
-            )
-            
-            # Execute each tool call
-            for tool_call in response.message.tool_calls:
-                tool_start_time = time.perf_counter()
-                
-                result = await self._tool_registry.execute(tool_call)
-                tool_duration_ms = int((time.perf_counter() - tool_start_time) * 1000)
-                
-                # Track tool in diagnostics
-                diagnostics.tools_used.append(ToolUsedInfo(
-                    name=tool_call.name,
-                    success=result.success,
-                    duration_ms=tool_duration_ms
-                ))
-                diagnostics.thoughts.append(
-                    f"Tool '{tool_call.name}' returned success={result.success}"
-                )
-                
-                # Adjust confidence based on tool success
-                if result.success:
-                    diagnostics.confidence_score = min(1.0, diagnostics.confidence_score + 0.1)
-                else:
-                    diagnostics.confidence_score = max(0.0, diagnostics.confidence_score - 0.2)
-                
-                tool_results.append({
-                    "name": tool_call.name,
-                    "arguments": tool_call.arguments,
-                    "result": result.content,
-                    "success": result.success,
-                    "duration_ms": tool_duration_ms,
-                })
-                
-                # Add tool response to conversation
-                tool_msg = ChatMessage(
-                    role="tool",
-                    content=result.content,
-                    tool_call_id=tool_call.id,
-                    name=tool_call.name,
-                )
-                messages.append(tool_msg)
-                
-                # Persist tool message to database
-                if self._analytics_storage:
-                    from analytics.models import ChatMessage as DBChatMessage
-                    self._analytics_storage.save_message(
-                        DBChatMessage(
-                            session_id=conv_id,
-                            role="tool",
-                            content=result.content,
-                            tool_call_id=tool_call.id,
-                            name=tool_call.name,
-                        )
-                    )
-        else:
-            # Max iterations reached - get final response without tool forcing
-            diagnostics.thoughts.append(f"Reached max iterations ({max_tool_rounds})")
-            response = await self._llm_router.chat(
-                messages=messages,
-                tools=tools,
-                temperature=0.3,
-                tool_choice="none",
-            )
-        
-        # Add assistant response to conversation
-        messages.append(response.message)
-        diagnostics.thoughts.append(
-            f"Response generated: {len(response.content) if response.content else 0} chars"
+        # Call GlueLLM wrapper (handles tool loop internally)
+        response = await self._gluellm_wrapper.chat(
+            messages=messages_for_llm,
+            system_prompt=system_prompt,
         )
+        
+        # Update session backend info
+        if is_new and self._analytics_collector:
+            self._analytics_collector.set_session_backend(
+                backend=self._gluellm_wrapper.active_provider or "unknown",
+                model_name=self._gluellm_wrapper.active_model or "unknown",
+                had_fallback=self._gluellm_wrapper.had_fallback,
+            )
+        
+        # Add assistant response to conversation history
+        if response.content:
+            assistant_msg = ChatMessage(role="assistant", content=response.content)
+            messages.append(assistant_msg)
         
         # Persist assistant message to database
         if self._analytics_storage and response.content:
@@ -400,12 +302,32 @@ class ChatService:
                 )
             )
         
-        return ChatServiceResponse(
-            content=response.content,
-            tool_calls=tool_results if tool_results else None,
-            session_id=conv_id,
-            diagnostics=diagnostics,
-        )
+        # Persist tool messages to database
+        if self._analytics_storage and response.tool_calls:
+            from analytics.models import ChatMessage as DBChatMessage
+            for tc in response.tool_calls:
+                self._analytics_storage.save_message(
+                    DBChatMessage(
+                        session_id=conv_id,
+                        role="tool",
+                        content=tc.get("result", ""),
+                        name=tc.get("name"),
+                    )
+                )
+        
+        # Update response with session ID
+        response.session_id = conv_id
+        
+        # Add processing info to diagnostics
+        if response.diagnostics:
+            response.diagnostics.thoughts.insert(
+                0, f"Processing user message: {len(user_message)} chars"
+            )
+            response.diagnostics.thoughts.append(
+                f"Response generated: {len(response.content)} chars"
+            )
+        
+        return response
     
     async def chat_stream(
         self,
@@ -538,6 +460,6 @@ class ChatService:
     
     async def close(self) -> None:
         """Clean up resources."""
-        if self._llm_router:
-            await self._llm_router.close()
+        # GlueLLM wrapper doesn't need explicit cleanup
+        pass
 

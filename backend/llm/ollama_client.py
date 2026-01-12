@@ -1,8 +1,19 @@
-"""Ollama LLM client implementation."""
+"""Ollama LLM client implementation.
+
+DEPRECATED: Superseded by gluellm_wrapper.py in Phase 8.
+Kept for rollback capability. Delete in Phase 9.
+"""
 
 import json
 import time
+import warnings
 from typing import Any
+
+warnings.warn(
+    "OllamaClient is deprecated. Use GlueLLMWrapper instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import httpx
 

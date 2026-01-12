@@ -1,8 +1,19 @@
-"""LLM router for managing multiple backends."""
+"""LLM router for managing multiple backends.
+
+DEPRECATED: Superseded by gluellm_wrapper.py in Phase 8.
+Kept for rollback capability. Delete in Phase 9.
+"""
 
 import logging
 import time
+import warnings
 from typing import TYPE_CHECKING, Literal
+
+warnings.warn(
+    "LLMRouter is deprecated. Use GlueLLMWrapper instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from ..config import Settings, get_settings
 from ..tools.schemas import ToolDefinition
