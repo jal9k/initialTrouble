@@ -132,3 +132,85 @@ class BaseDiagnostic(ABC):
             suggestions=suggestions,
         )
 
+
+class ScriptBasedDiagnostic(BaseDiagnostic):
+    """Diagnostic that executes native shell scripts.
+
+    This class provides a bridge between the Python diagnostic framework
+    and native shell scripts (Bash for macOS/Linux, PowerShell for Windows).
+
+    The scripts are expected to:
+    1. Accept parameters via command-line arguments
+    2. Output valid JSON to stdout
+    3. Return exit code 0 on success, non-zero on failure
+    4. Include standard fields: success, data, error, suggestions
+
+    Example:
+        >>> diag = ScriptBasedDiagnostic("ping_gateway")
+        >>> result = await diag.run(gateway="192.168.1.1", count=4)
+    """
+
+    def __init__(
+        self,
+        script_name: str,
+        description: str = "",
+        osi_layer: str = "Unknown",
+        executor: CommandExecutor | None = None,
+    ):
+        """Initialize a script-based diagnostic.
+
+        Args:
+            script_name: Name of the script (without extension)
+            description: Human-readable description
+            osi_layer: OSI layer this diagnostic operates on
+            executor: Command executor (optional, auto-detected)
+        """
+        super().__init__(executor)
+        self.name = script_name
+        self.description = description
+        self.osi_layer = osi_layer
+
+    async def run(self, **kwargs: Any) -> DiagnosticResult:
+        """Execute the diagnostic script.
+
+        Args:
+            **kwargs: Parameters to pass to the script
+
+        Returns:
+            DiagnosticResult parsed from script JSON output
+        """
+        from .runner import run_diagnostic_script
+
+        # Convert kwargs to command-line arguments
+        args = []
+        for key, value in kwargs.items():
+            if value is not None:
+                if isinstance(value, bool):
+                    if value:
+                        args.append(str(value).lower())
+                else:
+                    args.append(str(value))
+
+        return await run_diagnostic_script(self.name, args)
+
+
+def create_script_diagnostic(
+    script_name: str,
+    description: str = "",
+    osi_layer: str = "Unknown",
+) -> ScriptBasedDiagnostic:
+    """Factory function to create a script-based diagnostic.
+
+    Args:
+        script_name: Name of the script (without extension)
+        description: Human-readable description
+        osi_layer: OSI layer this diagnostic operates on
+
+    Returns:
+        ScriptBasedDiagnostic instance
+    """
+    return ScriptBasedDiagnostic(
+        script_name=script_name,
+        description=description,
+        osi_layer=osi_layer,
+    )

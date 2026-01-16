@@ -5,6 +5,7 @@
         dev dev-backend dev-frontend dev-desktop dev-server \
         build build-backend build-frontend build-app \
         test test-backend test-frontend test-cov test-unit test-integration \
+        test-scripts test-scripts-macos test-scripts-linux test-scripts-windows test-scripts-all validate-tools-sync \
         lint lint-backend lint-frontend typecheck quality \
         clean clean-backend clean-frontend clean-all \
         format download-ollama dist-macos dist-windows
@@ -138,6 +139,36 @@ test-integration: ## Run integration tests only
 test-frontend: ## Run frontend tests (if configured)
 	@echo "${BLUE}Running frontend tests...${NC}"
 	cd $(FRONTEND_DIR) && npm test 2>/dev/null || echo "${YELLOW}No test script configured${NC}"
+
+##@ Script Testing
+
+test-scripts: test-scripts-macos ## Run script tests for current platform
+	@echo "${GREEN}✓ Script tests complete${NC}"
+
+test-scripts-macos: ## Test macOS diagnostic scripts locally
+	@echo "${BLUE}Testing macOS scripts...${NC}"
+	@./scripts/test_diagnostics.sh macos
+	@echo "${GREEN}✓ macOS script tests complete${NC}"
+
+test-scripts-linux: ## Test Linux scripts via Docker
+	@echo "${BLUE}Testing Linux scripts via Docker...${NC}"
+	@docker run --rm -v $(PWD):/app -w /app ubuntu:22.04 \
+		bash -c "apt-get update -qq && apt-get install -qq -y jq net-tools iputils-ping dnsutils >/dev/null 2>&1 && ./scripts/test_diagnostics.sh linux"
+	@echo "${GREEN}✓ Linux script tests complete${NC}"
+
+test-scripts-windows: ## Test Windows scripts via Docker (requires PowerShell image)
+	@echo "${BLUE}Testing Windows scripts via Docker...${NC}"
+	@docker run --rm -v $(PWD):/app -w /app mcr.microsoft.com/powershell:latest \
+		pwsh -File /app/scripts/test_diagnostics.ps1
+	@echo "${GREEN}✓ Windows script tests complete${NC}"
+
+test-scripts-all: test-scripts-macos test-scripts-linux test-scripts-windows ## Test scripts on all platforms
+	@echo "${GREEN}✓ All platform tests complete${NC}"
+
+validate-tools-sync: ## Validate frontend tools match backend scripts
+	@echo "${BLUE}Validating frontend/backend tool sync...${NC}"
+	@python scripts/validate_tools_sync.py
+	@echo "${GREEN}✓ Tools validation complete${NC}"
 
 ##@ Linting & Formatting
 

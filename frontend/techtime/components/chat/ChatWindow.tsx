@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useChat, UseChatOptions } from '@/hooks/use-chat'
 import { cn } from '@/lib/utils'
+import { SCROLL_THRESHOLD } from '@/lib/constants'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -60,7 +61,7 @@ export function ChatWindow({ className, ...chatOptions }: ExtendedChatWindowProp
   // Handle scroll position for "scroll to bottom" button
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const target = event.target as HTMLDivElement
-    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100
+    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < SCROLL_THRESHOLD
     setShowScrollButton(!isNearBottom)
   }, [])
 

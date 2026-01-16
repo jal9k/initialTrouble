@@ -9,6 +9,7 @@ import { MobileSidebar } from '@/components/layout/MobileSidebar'
 import { RightPanel } from '@/components/layout/RightPanel'
 import { ChatWindow } from '@/components/chat/ChatWindow'
 import { listSessions, deleteSession, updateSession } from '@/lib/api'
+import { SESSION_PAGE_SIZE, SESSION_REFETCH_DELAY } from '@/lib/constants'
 import type { SessionListItem, DiagnosticTool } from '@/types'
 
 interface ChatPageClientProps {
@@ -33,7 +34,7 @@ export function ChatPageClient({
   // Function to refetch sessions from the API
   const refetchSessions = useCallback(async () => {
     try {
-      const result = await listSessions({ pageSize: 20 })
+      const result = await listSessions({ pageSize: SESSION_PAGE_SIZE })
       // Merge backend data with local data, preserving local previews for recent sessions
       // that might not have synced to the backend yet
       setSessions(prev => {
@@ -103,7 +104,7 @@ export function ChatPageClient({
       if (isFirstMessageRef.current) {
         isFirstMessageRef.current = false
         // Refetch after a short delay to allow backend to process
-        setTimeout(refetchSessions, 1000)
+        setTimeout(refetchSessions, SESSION_REFETCH_DELAY)
       }
     }
   }, [activeSessionId, refetchSessions])

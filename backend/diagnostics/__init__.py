@@ -3,14 +3,33 @@
 Tool registration with decision-boundary descriptions for small language models.
 Each tool description includes CALL WHEN and DO NOT CALL conditions to help
 small models (3B parameters) make correct tool selection decisions.
+
+This module supports two diagnostic implementations:
+1. Python-based (BaseDiagnostic subclasses) - Original implementation
+2. Script-based (ScriptBasedDiagnostic) - Native shell scripts for each OS
+
+Script-based diagnostics are located in:
+- backend/diagnostics/macos/*.sh (Bash scripts for macOS)
+- backend/diagnostics/linux/*.sh (Bash scripts for Linux)
+- backend/diagnostics/windows_scripts/*.ps1 (PowerShell scripts for Windows)
+
+To use script-based diagnostics:
+    from backend.diagnostics import run_diagnostic_script
+    result = await run_diagnostic_script("ping_gateway", ["192.168.1.1", "4"])
 """
 
-from .base import BaseDiagnostic, DiagnosticResult
+from .base import BaseDiagnostic, DiagnosticResult, ScriptBasedDiagnostic, create_script_diagnostic
 from .platform import Platform, CommandExecutor, get_platform
+from .runner import ScriptRunner, run_diagnostic_script, script_exists
 
 __all__ = [
     "BaseDiagnostic",
     "DiagnosticResult",
+    "ScriptBasedDiagnostic",
+    "create_script_diagnostic",
+    "ScriptRunner",
+    "run_diagnostic_script",
+    "script_exists",
     "Platform",
     "CommandExecutor",
     "register_all_diagnostics",
@@ -21,8 +40,8 @@ def register_all_diagnostics(registry) -> None:
     """
     Register all diagnostic functions with the tool registry.
 
-    This function imports and registers each diagnostic tool,
-    making them available for LLM function calling.
+    This function registers each diagnostic tool using native shell scripts
+    for improved reliability and cross-platform support.
 
     Each tool description follows this pattern:
     1. One-line summary of what the tool does
@@ -34,37 +53,20 @@ def register_all_diagnostics(registry) -> None:
         registry: ToolRegistry instance to register tools with
     """
     from ..tools.schemas import ToolParameter
-
-    # Import diagnostic implementations - Network tools
-    from .adapter import check_adapter_status
-    from .ip_config import get_ip_config
-    from .connectivity import ping_gateway, ping_dns
-    from .dns import test_dns_resolution
-    from .wifi import enable_wifi
     
-    # Import cross-platform tools
-    from .temp_files import cleanup_temp_files
-    from .process_mgmt import kill_process
-    from .vpn import test_vpn_connectivity
-    
-    # Import new cross-platform tools
-    from .reachability import ping_address, traceroute
-    from .bluetooth import toggle_bluetooth
-    from .ip_reset import ip_release, ip_renew, flush_dns
-    
-    # Import Windows-specific tools (only on Windows)
     current_platform = get_platform()
-    if current_platform == Platform.WINDOWS:
-        from .windows.dell_audio import fix_dell_audio
-        from .windows.office_repair import repair_office365
-        from .windows.system_repair import run_dism_sfc
-        from .windows.log_analysis import review_system_logs
-        from .windows.robocopy import robocopy
+    
+    # Create script-based diagnostic instances
+    # Each tool uses native shell scripts (bash for macOS/Linux, PowerShell for Windows)
+    def make_diagnostic(name: str):
+        """Helper to create a ScriptBasedDiagnostic for the current platform."""
+        return create_script_diagnostic(name, current_platform)
 
     # =========================================================================
     # TOOL 1: check_adapter_status
     # OSI Layer: Physical/Link (Layer 1-2)
     # Position in sequence: ALWAYS FIRST
+    # Implementation: Native shell script (bash/powershell)
     # =========================================================================
     registry.register(
         name="check_adapter_status",
@@ -94,7 +96,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(check_adapter_status)
+    )(make_diagnostic("check_adapter_status"))
 
     # =========================================================================
     # TOOL 2: get_ip_config
@@ -126,7 +128,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(get_ip_config)
+    )(make_diagnostic("get_ip_config"))
 
     # =========================================================================
     # TOOL 3: ping_gateway
@@ -167,11 +169,7 @@ PARAMETERS: gateway (string, optional) - Gateway IP to ping. count (number, opti
                 required=False,
             ),
         ],
-    )(ping_gateway)
-    
-    # #region agent log - H-D: Log ping_gateway registration
-    # Debug logging removed - was writing to hardcoded local path
-    # #endregion
+    )(make_diagnostic("ping_gateway"))
 
     # =========================================================================
     # TOOL 4: ping_dns
@@ -203,7 +201,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(ping_dns)
+    )(make_diagnostic("ping_dns"))
 
     # =========================================================================
     # TOOL 5: test_dns_resolution
@@ -241,7 +239,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(test_dns_resolution)
+    )(make_diagnostic("test_dns_resolution"))
 
     # =========================================================================
     # TOOL 6: enable_wifi
@@ -275,7 +273,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(enable_wifi)
+    )(make_diagnostic("enable_wifi"))
 
     # =========================================================================
     # TOOL 7: cleanup_temp_files
@@ -314,7 +312,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(cleanup_temp_files)
+    )(make_diagnostic("cleanup_temp_files"))
 
     # =========================================================================
     # TOOL 8: kill_process
@@ -360,7 +358,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(kill_process)
+    )(make_diagnostic("kill_process"))
 
     # =========================================================================
     # TOOL 9: test_vpn_connectivity
@@ -401,10 +399,11 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(test_vpn_connectivity)
+    )(make_diagnostic("test_vpn_connectivity"))
 
     # =========================================================================
     # WINDOWS-SPECIFIC TOOLS (only registered on Windows)
+    # Implementation: Native PowerShell scripts
     # =========================================================================
     if current_platform == Platform.WINDOWS:
         # =================================================================
@@ -445,7 +444,7 @@ OUTPUT MEANING:
                     required=False,
                 ),
             ],
-        )(fix_dell_audio)
+        )(make_diagnostic("fix_dell_audio"))
 
         # =================================================================
         # TOOL 11: repair_office365
@@ -480,7 +479,7 @@ OUTPUT MEANING:
                     required=False,
                 ),
             ],
-        )(repair_office365)
+        )(make_diagnostic("repair_office365"))
 
         # =================================================================
         # TOOL 12: run_dism_sfc
@@ -529,7 +528,7 @@ OUTPUT MEANING:
                     required=False,
                 ),
             ],
-        )(run_dism_sfc)
+        )(make_diagnostic("run_dism_sfc"))
 
         # =================================================================
         # TOOL 13: review_system_logs
@@ -576,7 +575,7 @@ OUTPUT MEANING:
                     required=False,
                 ),
             ],
-        )(review_system_logs)
+        )(make_diagnostic("review_system_logs"))
 
         # =================================================================
         # TOOL 14: robocopy
@@ -647,10 +646,11 @@ OUTPUT MEANING:
                     required=False,
                 ),
             ],
-        )(robocopy)
+        )(make_diagnostic("robocopy"))
 
     # =========================================================================
-    # NEW CROSS-PLATFORM TOOLS
+    # CROSS-PLATFORM TOOLS
+    # Implementation: Native shell scripts (bash for macOS/Linux, PowerShell for Windows)
     # =========================================================================
 
     # =========================================================================
@@ -692,7 +692,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(ping_address)
+    )(make_diagnostic("ping_address"))
 
     # =========================================================================
     # TOOL 16: traceroute
@@ -733,7 +733,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(traceroute)
+    )(make_diagnostic("traceroute"))
 
     # =========================================================================
     # TOOL 17: toggle_bluetooth
@@ -773,7 +773,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(toggle_bluetooth)
+    )(make_diagnostic("toggle_bluetooth"))
 
     # =========================================================================
     # TOOL 18: ip_release
@@ -809,7 +809,7 @@ IMPORTANT: After calling this, you MUST call ip_renew to restore connectivity.""
                 required=False,
             ),
         ],
-    )(ip_release)
+    )(make_diagnostic("ip_release"))
 
     # =========================================================================
     # TOOL 19: ip_renew
@@ -844,7 +844,7 @@ OUTPUT MEANING:
                 required=False,
             ),
         ],
-    )(ip_renew)
+    )(make_diagnostic("ip_renew"))
 
     # =========================================================================
     # TOOL 20: flush_dns
@@ -872,4 +872,4 @@ OUTPUT MEANING:
 - After flush, try accessing the website again
 - May require admin privileges on some systems""",
         parameters=[],
-    )(flush_dns)
+    )(make_diagnostic("flush_dns"))

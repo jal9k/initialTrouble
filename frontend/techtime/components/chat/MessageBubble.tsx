@@ -4,6 +4,7 @@ import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn, formatDate } from '@/lib/utils'
+import { COPY_FEEDBACK_DURATION } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Check, Copy, Zap } from 'lucide-react'
@@ -29,7 +30,7 @@ export function MessageBubble({
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), COPY_FEEDBACK_DURATION)
   }
 
   const showCopyButton = message.role === 'assistant'

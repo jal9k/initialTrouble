@@ -4,6 +4,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { ChatWebSocket } from '@/lib/websocket'
+import { WS_RECONNECT_INTERVAL, WS_MAX_RECONNECT_ATTEMPTS } from '@/lib/constants'
 import type { ConnectionState, ServerMessage, ClientMessage, WebSocketError } from '@/types'
 
 // ============================================================================
@@ -55,8 +56,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     url,
     autoConnect = true,
     reconnect = true,
-    reconnectInterval = 3000,
-    maxReconnectAttempts = 5,
+    reconnectInterval = WS_RECONNECT_INTERVAL,
+    maxReconnectAttempts = WS_MAX_RECONNECT_ATTEMPTS,
     onMessage,
     onOpen,
     onClose,

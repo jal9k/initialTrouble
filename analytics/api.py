@@ -130,6 +130,55 @@ class QualityResponse(BaseModel):
     drop_off_rate: float
 
 
+class TimeSeriesPointResponse(BaseModel):
+    """A single time series data point."""
+    
+    timestamp: datetime
+    value: int
+
+
+class SessionsOverTimeResponse(BaseModel):
+    """Response for sessions over time."""
+    
+    data: list[TimeSeriesPointResponse]
+
+
+class CategoryBreakdownItem(BaseModel):
+    """A single category breakdown item."""
+    
+    category: str
+    count: int
+    percentage: float
+
+
+class CategoryBreakdownResponse(BaseModel):
+    """Response for category breakdown."""
+    
+    categories: list[CategoryBreakdownItem]
+
+
+class FrontendSummaryResponse(BaseModel):
+    """Response for frontend analytics summary (matches frontend SessionSummary type)."""
+    
+    totalSessions: int
+    resolvedCount: int
+    unresolvedCount: int
+    abandonedCount: int
+    resolutionRate: float
+    averageTimeToResolution: float  # in milliseconds
+    totalCost: float
+
+
+class FrontendToolStatsItem(BaseModel):
+    """Tool stats item matching frontend ToolStats type."""
+    
+    toolName: str
+    executionCount: int
+    successRate: float
+    averageDuration: float  # in milliseconds
+    lastUsed: datetime
+
+
 def create_analytics_router(storage: AnalyticsStorage) -> APIRouter:
     """Create the analytics API router.
     
@@ -139,7 +188,7 @@ def create_analytics_router(storage: AnalyticsStorage) -> APIRouter:
     Returns:
         Configured APIRouter
     """
-    router = APIRouter(prefix="/analytics", tags=["analytics"])
+    router = APIRouter(prefix="/api/analytics", tags=["analytics"])
     pattern_analyzer = PatternAnalyzer(storage)
 
     def session_to_response(session: Session) -> SessionResponse:
@@ -317,6 +366,77 @@ def create_analytics_router(storage: AnalyticsStorage) -> APIRouter:
             abandoned_sessions=metrics.abandoned_sessions,
             drop_off_rate=metrics.drop_off_rate,
         )
+
+    @router.get("/sessions-over-time", response_model=list[TimeSeriesPointResponse])
+    async def get_sessions_over_time(
+        start_date: datetime = Query(description="Start date for time range"),
+        end_date: datetime = Query(description="End date for time range"),
+        granularity: str = Query(default="day", description="Granularity: hour, day, week"),
+    ) -> list[TimeSeriesPointResponse]:
+        """Get session count over time for charts."""
+        data = storage.get_sessions_over_time(
+            start_date=start_date,
+            end_date=end_date,
+            granularity=granularity,
+        )
+        return [
+            TimeSeriesPointResponse(timestamp=point["timestamp"], value=point["count"])
+            for point in data
+        ]
+
+    @router.get("/categories", response_model=list[CategoryBreakdownItem])
+    async def get_categories() -> list[CategoryBreakdownItem]:
+        """Get issue category breakdown for charts."""
+        breakdown = storage.get_issue_category_breakdown()
+        total = sum(breakdown.values()) or 1
+        return [
+            CategoryBreakdownItem(
+                category=category,
+                count=count,
+                percentage=round((count / total) * 100, 1)
+            )
+            for category, count in breakdown.items()
+        ]
+
+    # Frontend-compatible endpoints (matching frontend type expectations)
+    
+    @router.get("/frontend/summary", response_model=FrontendSummaryResponse)
+    async def get_frontend_summary(
+        start_date: datetime | None = Query(default=None, description="Filter by start date"),
+        end_date: datetime | None = Query(default=None, description="Filter by end date"),
+    ) -> FrontendSummaryResponse:
+        """Get analytics summary in frontend-compatible format."""
+        summary = storage.get_session_summary(start_date=start_date, end_date=end_date)
+        
+        total = summary.total_sessions or 1
+        resolution_rate = summary.resolved_count / total if total > 0 else 0.0
+        
+        return FrontendSummaryResponse(
+            totalSessions=summary.total_sessions,
+            resolvedCount=summary.resolved_count,
+            unresolvedCount=summary.unresolved_count,
+            abandonedCount=summary.abandoned_count,
+            resolutionRate=resolution_rate,
+            averageTimeToResolution=summary.avg_time_to_resolution_seconds * 1000,  # Convert to ms
+            totalCost=summary.total_cost_usd,
+        )
+
+    @router.get("/frontend/tools", response_model=list[FrontendToolStatsItem])
+    async def get_frontend_tool_stats() -> list[FrontendToolStatsItem]:
+        """Get tool statistics in frontend-compatible format."""
+        stats = storage.get_tool_stats()
+        now = datetime.now()
+        
+        return [
+            FrontendToolStatsItem(
+                toolName=s.tool_name,
+                executionCount=s.total_calls,
+                successRate=s.success_rate,
+                averageDuration=s.avg_execution_time_ms,
+                lastUsed=now,  # Storage doesn't track last used, use current time
+            )
+            for s in stats
+        ]
 
     return router
 

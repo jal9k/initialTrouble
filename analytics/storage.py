@@ -727,6 +727,56 @@ class AnalyticsStorage:
             """)
             return {row["issue_category"]: row["count"] for row in cursor.fetchall()}
 
+    def get_sessions_over_time(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        granularity: str = "day",  # "hour", "day", "week"
+    ) -> list[dict[str, Any]]:
+        """Get session counts over time for time series charts."""
+        # Determine the SQLite date format based on granularity
+        date_format = {
+            "hour": "%Y-%m-%d %H:00:00",
+            "day": "%Y-%m-%d",
+            "week": "%Y-%W",
+        }.get(granularity, "%Y-%m-%d")
+        
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute(f"""
+                SELECT 
+                    strftime('{date_format}', started_at) as period,
+                    COUNT(*) as count
+                FROM sessions
+                WHERE started_at >= ? AND started_at <= ?
+                GROUP BY strftime('{date_format}', started_at)
+                ORDER BY period
+            """, (start_date.isoformat(), end_date.isoformat()))
+            
+            results = []
+            for row in cursor.fetchall():
+                # Parse the period back to a datetime
+                period_str = row["period"]
+                try:
+                    if granularity == "hour":
+                        timestamp = datetime.strptime(period_str, "%Y-%m-%d %H:%M:%S")
+                    elif granularity == "week":
+                        # Week format is YYYY-WW, convert to first day of that week
+                        year, week = period_str.split("-")
+                        timestamp = datetime.strptime(f"{year}-W{week}-1", "%Y-W%W-%w")
+                    else:
+                        timestamp = datetime.strptime(period_str, "%Y-%m-%d")
+                except ValueError:
+                    timestamp = datetime.now()
+                
+                results.append({
+                    "timestamp": timestamp,
+                    "count": row["count"],
+                })
+            
+            return results
+
     def get_cost_by_period(
         self,
         start_date: datetime | None = None,

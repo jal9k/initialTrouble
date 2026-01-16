@@ -61,11 +61,7 @@ export interface UseChatReturn {
   retryLastMessage: () => Promise<void>
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
-const STORAGE_KEY = 'techtime_chat'
+import { CHAT_STORAGE_KEY } from '@/lib/constants'
 
 // ============================================================================
 // Hook Implementation
@@ -125,14 +121,8 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   // Handle incoming WebSocket messages
   const handleWebSocketMessage = useCallback(
     (serverMessage: ServerMessage) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/daa62454-9fdd-435b-b38b-89260088c854',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-chat.ts:handleWebSocketMessage',message:'Received server message',data:{hasToolCalls:!!serverMessage.tool_calls,toolCallCount:serverMessage.tool_calls?.length||0,toolNames:serverMessage.tool_calls?.map(tc=>tc.name)||[],hasResponse:!!serverMessage.response,responseLen:serverMessage.response?.length||0,hasDiagnostics:!!serverMessage.diagnostics},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-FE'})}).catch(()=>{});
-      // #endregion
       // Handle tool calls - notify for each tool that's starting
       if (serverMessage.tool_calls?.length) {
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/daa62454-9fdd-435b-b38b-89260088c854',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-chat.ts:handleToolCalls',message:'Processing tool calls',data:{count:serverMessage.tool_calls.length,tools:serverMessage.tool_calls.map(tc=>({name:tc.name,id:tc.id}))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-FE-TOOLS'})}).catch(()=>{});
-        // #endregion
         // Track the first tool as current (UI can only show one at a time)
         setCurrentToolExecution(serverMessage.tool_calls[0])
         // But notify callbacks for ALL tool calls
@@ -178,9 +168,6 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           diagnostics,
           verification
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/daa62454-9fdd-435b-b38b-89260088c854',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'use-chat.ts:setAssistantMessage',message:'Adding assistant message',data:{hasToolCalls:!!assistantMessage.toolCalls,toolCallCount:assistantMessage.toolCalls?.length||0,hasDiagnostics:!!assistantMessage.diagnostics,diagnosticsThoughtsCount:assistantMessage.diagnostics?.thoughts?.length||0,hasVerification:!!assistantMessage.verification},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-FE-MSG'})}).catch(()=>{});
-        // #endregion
 
         setMessages((prev) => [...prev, assistantMessage])
         callbacksRef.current.onMessage?.(assistantMessage)
@@ -219,7 +206,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   useEffect(() => {
     if (persist && !initialConversationId && typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY)
+        const stored = localStorage.getItem(CHAT_STORAGE_KEY)
         if (stored) {
           const parsed = JSON.parse(stored)
           if (parsed.messages) {
@@ -252,7 +239,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   useEffect(() => {
     if (persist && messages.length > 0 && typeof window !== 'undefined') {
       localStorage.setItem(
-        STORAGE_KEY,
+        CHAT_STORAGE_KEY,
         JSON.stringify({
           messages,
           conversationId
@@ -353,7 +340,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     setError(null)
     setCurrentToolExecution(null)
     if (persist && typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(CHAT_STORAGE_KEY)
     }
   }, [persist])
 

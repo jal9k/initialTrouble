@@ -1,87 +1,21 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { SummaryCards } from '@/components/analytics/SummaryCards'
 import { SessionsOverTimeChart, CategoryChart, ToolUsageChart } from '@/components/analytics/SessionsChart'
 import { ToolStatsTable } from '@/components/analytics/ToolStatsTable'
 import { DateRangePicker } from '@/components/analytics/DateRangePicker'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { AlertCircle, RefreshCw } from 'lucide-react'
+import {
+  getAnalyticsSummary,
+  getToolStats,
+  getSessionsOverTime,
+  getCategoryBreakdown
+} from '@/lib/api'
+import { DEFAULT_DATE_RANGE_MS } from '@/lib/constants'
 import type { SessionSummary, TimeSeriesPoint, CategoryBreakdown, ToolStats } from '@/types'
-
-// Mock data - would come from API
-const mockSummary: SessionSummary = {
-  totalSessions: 147,
-  resolvedCount: 115,
-  unresolvedCount: 22,
-  abandonedCount: 10,
-  resolutionRate: 0.782,
-  averageTimeToResolution: 272000, // 4m 32s in ms
-  totalCost: 12.45
-}
-
-const mockCategoryData: CategoryBreakdown[] = [
-  { category: 'connectivity', count: 45, percentage: 30.6 },
-  { category: 'dns', count: 38, percentage: 25.9 },
-  { category: 'wifi', count: 32, percentage: 21.8 },
-  { category: 'ip_config', count: 20, percentage: 13.6 },
-  { category: 'unknown', count: 12, percentage: 8.2 }
-]
-
-const mockToolUsage = [
-  { name: 'ping_gateway', count: 89 },
-  { name: 'test_dns_resolution', count: 76 },
-  { name: 'get_ip_config', count: 65 },
-  { name: 'check_adapter_status', count: 54 },
-  { name: 'ping_dns', count: 43 }
-]
-
-function createMockToolStats(): ToolStats[] {
-  const now = Date.now()
-  return [
-    {
-      toolName: 'ping_gateway',
-      executionCount: 89,
-      successRate: 0.92,
-      averageDuration: 245,
-      lastUsed: new Date(now - 1000 * 60 * 5)
-    },
-    {
-      toolName: 'test_dns_resolution',
-      executionCount: 76,
-      successRate: 0.88,
-      averageDuration: 512,
-      lastUsed: new Date(now - 1000 * 60 * 15)
-    },
-    {
-      toolName: 'get_ip_config',
-      executionCount: 65,
-      successRate: 0.98,
-      averageDuration: 128,
-      lastUsed: new Date(now - 1000 * 60 * 30)
-    },
-    {
-      toolName: 'check_adapter_status',
-      executionCount: 54,
-      successRate: 0.95,
-      averageDuration: 312,
-      lastUsed: new Date(now - 1000 * 60 * 60)
-    },
-    {
-      toolName: 'ping_dns',
-      executionCount: 43,
-      successRate: 0.85,
-      averageDuration: 189,
-      lastUsed: new Date(now - 1000 * 60 * 120)
-    }
-  ]
-}
-
-function createMockSessionsData(): TimeSeriesPoint[] {
-  const now = Date.now()
-  return Array.from({ length: 14 }, (_, i) => ({
-    timestamp: new Date(now - (13 - i) * 24 * 60 * 60 * 1000),
-    value: Math.floor(Math.random() * 20) + 5
-  }))
-}
 
 interface DateRange {
   startDate: Date
@@ -91,27 +25,107 @@ interface DateRange {
 function getInitialDateRange(): DateRange {
   const now = Date.now()
   return {
-    startDate: new Date(now - 30 * 24 * 60 * 60 * 1000),
+    startDate: new Date(now - DEFAULT_DATE_RANGE_MS),
     endDate: new Date(now)
   }
 }
 
+// Default empty states
+const emptySummary: SessionSummary = {
+  totalSessions: 0,
+  resolvedCount: 0,
+  unresolvedCount: 0,
+  abandonedCount: 0,
+  resolutionRate: 0,
+  averageTimeToResolution: 0,
+  totalCost: 0
+}
+
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState<DateRange>(getInitialDateRange)
   
-  const mockSessionsData = useMemo(() => createMockSessionsData(), [])
-  const mockToolStats = useMemo(() => createMockToolStats(), [])
+  // Data state
+  const [summary, setSummary] = useState<SessionSummary>(emptySummary)
+  const [sessionsData, setSessionsData] = useState<TimeSeriesPoint[]>([])
+  const [categoryData, setCategoryData] = useState<CategoryBreakdown[]>([])
+  const [toolStats, setToolStats] = useState<ToolStats[]>([])
 
-  // Simulate loading
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500)
-    return () => clearTimeout(timer)
+  // Fetch all dashboard data
+  const fetchData = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      // Fetch all data in parallel
+      const [summaryResult, sessionsResult, categoriesResult, toolsResult] = await Promise.all([
+        getAnalyticsSummary({
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate
+        }),
+        getSessionsOverTime({
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          granularity: 'day'
+        }),
+        getCategoryBreakdown(),
+        getToolStats()
+      ])
+      
+      setSummary(summaryResult)
+      setSessionsData(sessionsResult)
+      setCategoryData(categoriesResult)
+      setToolStats(toolsResult)
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+    } finally {
+      setIsLoading(false)
+    }
   }, [dateRange])
 
+  // Fetch data on mount and when date range changes
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
   const handleDateRangeChange = (range: DateRange) => {
-    setIsLoading(true)
     setDateRange(range)
+  }
+
+  // Convert tool stats to tool usage format for the chart
+  const toolUsageData = toolStats.map(stat => ({
+    name: stat.toolName,
+    count: stat.executionCount
+  }))
+
+  // Error state
+  if (error && !isLoading) {
+    return (
+      <div className="container py-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Analytics and insights for your support sessions
+            </p>
+          </div>
+        </div>
+        
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
+            <h3 className="font-semibold mb-2">Failed to load dashboard</h3>
+            <p className="text-sm text-muted-foreground mb-4">{error}</p>
+            <Button variant="outline" onClick={fetchData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -124,28 +138,39 @@ export default function DashboardPage() {
             Analytics and insights for your support sessions
           </p>
         </div>
-        <DateRangePicker
-          value={dateRange}
-          onChange={handleDateRangeChange}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchData}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <DateRangePicker
+            value={dateRange}
+            onChange={handleDateRangeChange}
+          />
+        </div>
       </div>
 
       {/* Summary Cards */}
       <SummaryCards
-        summary={mockSummary}
+        summary={summary}
         isLoading={isLoading}
       />
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">
         <SessionsOverTimeChart
-          data={mockSessionsData}
+          data={sessionsData}
           chartType="area"
           title="Sessions Over Time"
           isLoading={isLoading}
         />
         <CategoryChart
-          data={mockCategoryData}
+          data={categoryData}
           title="Issue Categories"
           isLoading={isLoading}
         />
@@ -154,12 +179,12 @@ export default function DashboardPage() {
       {/* Tool Usage and Stats */}
       <div className="grid gap-6 lg:grid-cols-2">
         <ToolUsageChart
-          data={mockToolUsage}
+          data={toolUsageData}
           title="Tool Usage"
           isLoading={isLoading}
         />
         <ToolStatsTable
-          stats={mockToolStats}
+          stats={toolStats}
           title="Tool Statistics"
           isLoading={isLoading}
         />

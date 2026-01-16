@@ -65,6 +65,11 @@ export type IssueCategory =
   | 'wifi'
   | 'ip_config'
   | 'gateway'
+  | 'bluetooth'
+  | 'vpn'
+  | 'maintenance'
+  | 'process'
+  | 'windows'
   | 'unknown'
 
 export interface Session {
@@ -102,7 +107,7 @@ export interface DiagnosticTool {
   name: string
   displayName: string
   description: string
-  category: 'connectivity' | 'dns' | 'wifi' | 'ip_config' | 'system'
+  category: 'connectivity' | 'dns' | 'wifi' | 'ip_config' | 'system' | 'bluetooth' | 'vpn' | 'maintenance' | 'process' | 'windows'
   parameters: ToolParameter[]
   osiLayer: number
 }

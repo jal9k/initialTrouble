@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { formatDate, formatNumber, formatDuration } from '@/lib/utils'
+import { SUCCESS_RATE_HIGH_THRESHOLD, SUCCESS_RATE_MEDIUM_THRESHOLD } from '@/lib/constants'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -90,10 +91,10 @@ export function ToolStatsTable({
   }
 
   const getSuccessRateBadge = (rate: number) => {
-    if (rate >= 0.9) {
+    if (rate >= SUCCESS_RATE_HIGH_THRESHOLD) {
       return <Badge variant="default" className="bg-green-500">High</Badge>
     }
-    if (rate >= 0.7) {
+    if (rate >= SUCCESS_RATE_MEDIUM_THRESHOLD) {
       return <Badge variant="secondary">Medium</Badge>
     }
     return <Badge variant="destructive">Low</Badge>
